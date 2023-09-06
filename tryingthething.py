@@ -23,7 +23,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=2, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=8, min_files=12):
+    def __init__(self, processes=2, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=10, min_files=12):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -859,7 +859,7 @@ if __name__ == '__main__':
     mpl.rcParams['figure.figsize'] = (8, 8)
 
     warnings.filterwarnings('ignore', category=mpl.MatplotlibDeprecationWarning)
-    test = Cosmicremoval_class(processes=2, min_filenb=30)
+    test = Cosmicremoval_class(processes=8, min_filenb=30)
     test.Multiprocess()
     warnings.filterwarnings("default", category=mpl.MatplotlibDeprecationWarning)
 
