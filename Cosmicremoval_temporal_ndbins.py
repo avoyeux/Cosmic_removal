@@ -44,7 +44,8 @@ class Cosmicremoval_class:
     def Paths(self, exposure='none', detector='none'):
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
-        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_bins5dn_final')
+        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_{self.bins}dn_'
+                                              f'final')
 
         if exposure != 'none':
             exposure_path = os.path.join(main_path, f'Exposure{exposure}')

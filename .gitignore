@@ -1,3 +1,6 @@
 .venv/
+.idea/
 *Temporal*
+__pycache__/
 !*temporal*.py
+batch_job.sh
