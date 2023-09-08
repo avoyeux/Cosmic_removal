@@ -1,1 +1,3 @@
 .venv/
+*Temporal*
+!*temporal*.py
