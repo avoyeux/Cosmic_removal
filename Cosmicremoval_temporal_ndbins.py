@@ -24,7 +24,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=8, min_files=12):
+    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=8, min_files=12, bins=5):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -32,6 +32,7 @@ class Cosmicremoval_class:
         self.min_filenb = min_filenb
         self.months_interval = months_interval  # time interval to consider in months
         self.min_files = min_files
+        self.bins = bins
 
         # Miscellaneous
         self.ref_pixels = list(map(int, np.linspace(0, 1023, 2)))  # reference pixels for the init madmode calculations
@@ -842,7 +843,7 @@ class Cosmicremoval_class:
         """Small function to calculate the appropriate bin count"""
         val_range = np.max(data) - np.min(data)
         # bins = int(len(data) * val_range / 500)  #was 500 before
-        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, 5))
+        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if len(bins) < 8:
             bins = 8
         return bins
