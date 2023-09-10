@@ -4,3 +4,4 @@
 __pycache__/
 !*temporal*.py
 batch_job.sh
+*.out
