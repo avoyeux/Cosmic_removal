@@ -24,7 +24,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=12, min_files=12, bins=5):
+    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12, bins=1):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -45,7 +45,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_{self.bins}dn_'
-                                              f'final')
+                                              f'final_v2')
 
         if exposure != 'none':
             exposure_path = os.path.join(main_path, f'Exposure{exposure}')
@@ -329,7 +329,7 @@ class Cosmicremoval_class:
             month_max = month_max % 12
         if month_min < 1:
             year_min -= (abs(month_min) // 12) + 1
-            month_min += 12 * ((abs(month_min) // 12) + 1)
+            month_min = 12 - (abs(month_min) % 12)
 
         date_max = f'{year_max:04d}{month_max:02d}{date.day:02d}T{date.hour:02d}{date.minute:02d}{date.second:02d}'
         date_min = f'{year_min:04d}{month_min:02d}{date.day:02d}T{date.hour:02d}{date.minute:02d}{date.second:02d}'
