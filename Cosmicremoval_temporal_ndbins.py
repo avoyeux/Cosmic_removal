@@ -381,8 +381,8 @@ class Cosmicremoval_class:
             modes.append(mode)
             masks.append(chunks_masks[image_index])
 
-            # Histo plotting
-            self.Plotting_init(paths, nw_used_images, mad, mode, SPIOBSID, loop)
+            # # Histo plotting
+            # self.Plotting_init(paths, nw_used_images, mad, mode, SPIOBSID, loop)
 
         mads = np.array(mads)
         modes = np.array(modes)
