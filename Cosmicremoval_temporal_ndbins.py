@@ -24,7 +24,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=18, min_files=12, bins=1):
+    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12, bins=1):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -160,25 +160,20 @@ class Cosmicremoval_class:
             files = []
             for detector in range(2):
                 if detector == 0:
-                    temp = hdul[0].header['T_SW']
+                    temp = temp1
                 else:
-                    temp = hdul[0].header['T_LW']
-                # if temp > 0:  # TODO: this code won't work if this condition is True for only one detector
-                #     a += 1
-                #     continue
+                    temp = temp2
                 data = hdul[detector].data
                 images.append(np.double(data[0, :, :, 0]))
                 dsun.append(dist_SUN)
                 temps.append(temp)
                 dates.append(date)
                 files.append(file)
-
             all_images.append(images)
             all_dsun.append(dsun)
             all_temps.append(temps)
             all_dates.append(dates)
             all_files.append(files)
-
         all_images = np.array(all_images)
         all_dsun = np.array(all_dsun)
         all_dates = np.array(all_dates)
@@ -205,30 +200,19 @@ class Cosmicremoval_class:
 
         # Choosing to multiprocess or not
         if self.processes > 1:
-            print('yes1')
-            print(f'the cpu count is {os.cpu_count()}')
             print(f'self.processes is {self.processes}')
-            processes = []
             args = [(exposure,) for exposure in self.exposures]
-            # for loop in range(self.processes):
-            #     keyword = {'exposure': args[loop]}
-            #     print(f'keyword is :{keyword}')
-            #     processes.append(Process(target=self.Main, kwargs=keyword))
-            #     processes[-1].start()
             pool = mp.Pool(processes=self.processes)
             pool.starmap(self.Main, args)
             pool.close()
             pool.join()
-            print('yes2')
-            # for loop in range(self.processes):
-            #     processes[loop].join()
         else:
             for exposure in self.exposures:
                 self.Main(exposure)
 
     @decorators.running_time
     def Main(self, exposure):
-        print(f'the process id is {os.getpid()}')
+        print(f'The process id is {os.getpid()}')
         # MAIN LOOP
         # Initialisation of the stats for csv file saving
         data_pandas_exposure = pd.DataFrame()
@@ -240,27 +224,18 @@ class Cosmicremoval_class:
             print(f'\033[91m Exp{exposure} -- Less than {self.min_filenb} usable files. '
                   f'Changing exposure times.\033[0m')
             return
-        print("_______________________")
+
         for detector in range(2):
             paths = self.Paths(exposure=exposure, detector=detector)
 
             images, date, dsun = all_images[:, detector], all_date[:, detector], all_dsun[:, detector]
-            temp, filenames = all_temp[:, detector], all_filenames[:, detector]
-
-            # # Creation of the ref mad and mode
-            # ref_mad, ref_mode = self.Madmode_list_ref(images)
+            temp, filenames = all_temp[:, detector], all_filenames[:, detector]  # TODO: no need for file name, dsun and dates
 
             # # Saving these stats in a csv file
             # new_dict = {'Nb of used files': np.full((2,), len(filenames))}
             # pandas_new = pd.DataFrame(new_dict)
             # csv_name = f'Info_nbfiles{exposure}.csv'
             # pandas_new.to_csv(os.path.join(paths['Main'], csv_name), index=False)
-
-            # # Plotting
-            # self.Plotting_init(paths, images, ref_mad, ref_mode)
-            # self.Plotting(paths, chunks, chunks_mad, chunks_mode, chunks_mask, date, dsun, temp)
-            # self.Plotting_special(paths, chunks, chunks_mask)
-            # print(f"Exp{exposure}_det{detector} -- Special and normal histogram plotting done.")
 
             # MULTIPLE DARKS analysis
             same_darks, positions = self.Samedarks(filenames)
@@ -274,22 +249,18 @@ class Cosmicremoval_class:
             # pandas_mad.to_csv(os.path.join(paths['Detector'], mad_name), index=False)
             # print(f'Exp{exposure}_det{detector} -- Percentages saved to csv file.')
 
-            #print(f'Exp{exposure}_det{detector} -- Starting chunks.')
+            print(f'Exp{exposure}_det{detector} -- Starting chunks.')
             for SPIOBSID, files in same_darks.items():
                 if len(files) < 3:
                     continue
                 data, mads, modes, masks = self.time_interval(exposure, detector, filenames, files, images, positions,
-                                                            SPIOBSID)
+                                                            SPIOBSID)  # TODO: here
                 if len(data) == 0:
                     continue
 
                 # Error calculations
                 nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio = self.Stats(data, masks,
                                                                                                             modes)
-
-                # MEDIAN PLOTTING FUNC
-                # self.Medianplotting(paths, files, data, masks, mode)
-                # self.Stats_plotting(paths, files, data, nw_masks)
 
                 # # Saving the stats in a csv file
                 data_pandas = self.Unique_datadict(exposure, detector, files, mads, modes, detections, errors, ratio,
@@ -319,7 +290,7 @@ class Cosmicremoval_class:
         date = parse_date(name_dict['time'])
 
         date_interval = int(self.months_interval / 2)
-        year_max = date.year  # TODO: need to add the value to the self.
+        year_max = date.year  # TODO: need to add the value to the self.  (????)
         year_min = date.year
         month_max = date.month + date_interval
         month_min = date.month - date_interval
@@ -336,29 +307,27 @@ class Cosmicremoval_class:
 
         position = []
         for loop, file in enumerate(filenames):
-            name_dict = common.SpiceUtils.parse_filename(file)
+            name_dict = common.SpiceUtils.parse_filename(file)  # TODO: I could use the dates I have in the lists
             if (name_dict['time'] >= date_min) and (name_dict['time'] <= date_max):
                 position.append(loop)
                 if file == first_filename:
-                    first_pos = loop
+                    first_pos = loop  # global index of the first image with the same ID
                 if file == files[-1]:
-                    last_pos = loop
-        position = np.array(position)
+                    last_pos = loop  # global index of the last image with the same ID
+        position = np.array(position)  # the positions of the files in the right time interval
 
-        # TODO: I am changing the stuff here so that the images with the same ID are not taken into account
-        used_images = images[position]
-        # mad, mode, chunks_masks = self.Chunks_func(used_images)
+        timeint_images = images[position]  # the images in the time interval
+        # mad, mode, chunks_masks = self.Chunks_func(timeint_images)
 
-        # Making a for loop so that the acquisitions with the same ID are not taken into account for the mad and mode
+        # Making a loop so that the acquisitions with the same ID are not taken into account for the mad and mode
         mads = []
         modes = []
         masks = []
-        paths = self.Paths(exposure, detector)
         for loop in range(len(files)):
-            index_n = first_pos - position[0] + loop
+            index_n = first_pos - position[0] + loop  # index of the image in the timeint_images array
 
-            delete1_init = first_pos - position[0]
-            delete1_end = index_n
+            delete1_init = first_pos - position[0]  # first pos in the reference frame of timeinit_images
+            delete1_end = index_n  # index of the image in timeinit_images
             delete2_init = index_n + 1
             delete2_end = last_pos + 1 - position[0]
 
@@ -366,30 +335,26 @@ class Cosmicremoval_class:
             delete2 = np.arange(delete2_init, delete2_end)
             delete_tot = np.concatenate((delete1, delete2), axis=0)
 
-            nw_used_images = np.delete(used_images, delete_tot, axis=0)  # Used images without the same IDs
+            nw_timeinit_images = np.delete(timeint_images, delete_tot, axis=0)  # Used images without the same IDs
 
-            print(f'Exp{exposure}_det{detector}_ID{SPIOBSID} -- Nb of used files: {len(nw_used_images)}')
+            print(f'Exp{exposure}_det{detector}_ID{SPIOBSID} -- Nb of used files: {len(nw_timeinit_images)}')
 
-            if len(nw_used_images) < self.min_files:
+            if len(nw_timeinit_images) < self.min_files:
                 print(f'\033[31mExp{exposure}_det{detector}_ID{SPIOBSID} -- Less than {self.min_files} files. '
                       f'Going to next SPIOBSID\033[0m')
                 return [], [], [], []
 
+            mad, mode, chunks_masks = self.Chunks_func(nw_timeinit_images)
             image_index = index_n - len(delete1)
-            mad, mode, chunks_masks = self.Chunks_func(nw_used_images)
             mads.append(mad)
             modes.append(mode)
             masks.append(chunks_masks[image_index])
-
-            # # Histo plotting
-            # self.Plotting_init(paths, nw_used_images, mad, mode, SPIOBSID, loop)
-
         mads = np.array(mads)
         modes = np.array(modes)
-        masks = np.array(masks)
+        masks = np.array(masks)  # all the masks for the images with the same ID
 
         loops = positions[SPIOBSID]
-        data = images[loops]
+        data = images[loops]  # all the images with the same ID
         return data, mads, modes, masks
 
     def Percentages_stdnmad(self, exposure, detector, data, mad, mode):
@@ -544,14 +509,12 @@ class Cosmicremoval_class:
         meds_dif = data - data_med
 
         # Difference between the end result and the initial one
-        # modes = np.zeros_like(data)
-        # modes[:] = mode
         nw_data[masks] = modes[masks]
         nw_meds_dif = nw_data - data_med
 
         # Creating a new set of masks that shows where the method made an error
         nw_masks = np.zeros_like(masks, dtype='bool')
-        filters = abs(nw_meds_dif) > abs(meds_dif)
+        filters = np.abs(nw_meds_dif) > np.abs(meds_dif)
         nw_masks[filters] = True
 
         ### MAIN STATS
@@ -566,7 +529,7 @@ class Cosmicremoval_class:
         weights_error = np.sum(weights_errors, axis=(1, 2))
         weights_tot = np.sum(weights_tots, axis=(1, 2))
         # Calculating the ratios
-        if 0 not in detections:  # If statements two separate cases (with or without detections)
+        if 0 not in detections:  # If statements seperates two cases (with or without detections)
             ratio = errors / detections
             weights_ratio = weights_error / weights_tot
         else:
@@ -586,295 +549,19 @@ class Cosmicremoval_class:
         return nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio
 
     ################################################ PLOTTING functions ################################################
-    def Plotting_init(self, paths, all_images, ref_mad, ref_mode, SPIOBSID, loop):
-        """Function to plot the initial histograms"""
-
-        for r in self.ref_pixels:
-            for c in self.ref_pixels:
-                # Variable initialisation
-                data = np.copy(all_images[:, r, c])
-                bins = self.Bins(data)
-
-                # REF HISTO plotting
-                hist_name = f'histo_{SPIOBSID}_{loop}_r{r}_c{c}.png'
-                plt.hist(all_images[:, r, c], bins=bins)
-                plt.title(f'mode: {round(ref_mode[r, c], 2)}; mad: {round(ref_mad[r, c], 2)}.', fontsize=12)
-                plt.xlabel('Detector count', fontsize=12)
-                plt.ylabel('Frequency', fontsize=12)
-                plt.xticks(fontsize=12)
-                Cosmicremoval_class.Savefig_config(os.path.join(paths['Histograms'], hist_name))
-
-    def Plotting(self, paths, images, mad, mode, masks, date, dsun, temp):
-        """Function to plot most of the needed data"""
-
-        for r in self.ref_pixels:
-            for c in self.ref_pixels:
-                # Variable initialisation
-                data = np.copy(images[:, r, c])
-                bins = self.Bins(data)
-
-                # REF HISTO plotting
-                hist_name = f'histo_r{r}_c{c}.png'
-                plt.hist(data, bins=bins)
-                plt.axvline(mode[r, c] - self.coef * mad[r, c], color='red', linestyle='--', label='Clipping value')
-                plt.axvline(mode[r, c] + self.coef * mad[r, c], color='red', linestyle='--')
-                plt.title(f'mode: {round(mode[r, c], 2)}; mad: {round(mad[r, c], 2)}.')
-                plt.xlabel('Detector count')
-                plt.ylabel('Frequency')
-                plt.xticks(fontsize=12)
-                plt.legend(loc=1)
-                Cosmicremoval_class.Savefig_config(os.path.join(paths['Histograms'], hist_name))
-
-                # TEMP plotting
-                temp_name = f'temp_r{r}_c{c}.png'
-                plt.scatter(temp, data)
-                plt.title('Detector counts as a function of temperature.')
-                plt.xlabel('Temperature [Celsius]')
-                plt.ylabel('Counts')
-                plt.savefig(os.path.join(paths['Temperatures'], temp_name))
-                plt.close()
-
-                # DATE plotting
-                date_name = f'date_r{r}_c{c}.png'
-                plt.scatter(date, data)
-                plt.title('Detector counts as a function of acquisition date.')
-                plt.xlabel('Date  [YYYY-MM]')
-                plt.ylabel('Counts')
-                plt.savefig(os.path.join(paths['Dates'], date_name))
-                plt.close()
-
-        # Variable initialisation for total data stats
-        med_pixels = np.median(images, axis=(1, 2))
-        sum_masks = np.sum(masks, axis=0)
-
-        # TOTAL DATEnDISTANCE plotting
-        meddate_name = 'Meddate.png'
-        fig, ax1 = plt.subplots()
-        ax1.scatter(date, med_pixels, color='b', s=20)
-        plt.title('Detector counts and distance to Sun as as a function of acquisition date.')
-        ax1.set_xlabel('Date  [YYYY-MM]', fontsize=12)
-        ax1.set_ylabel('Median counts', color='b', fontsize=12)
-        ax1.tick_params(axis='y', which='major', labelsize=12)
-        ax1.tick_params(axis='x', which='major', labelsize=10)
-        ax2 = ax1.twinx()
-        ax2.scatter(date, dsun, color='g', s=12)
-        ax2.set_ylabel('Distance to Sun [m]', color='g', fontsize=12)
-        ax2.set_ylim(0.3e11, 2e11)
-        ax2.invert_yaxis()
-        ax2.tick_params(axis='y', which='major', labelsize=12)
-        ax2.tick_params(axis='x', which='major', labelsize=10)
-        plt.savefig(os.path.join(paths['Dates'], meddate_name), bbox_inches='tight')
-        plt.close()
-
-        # TOTAL temperature plotting
-        temp_name = f'medtemp.png'
-        plt.scatter(temp, med_pixels)
-        plt.title('Median detector counts as a function of temperature.')
-        plt.xlabel('Temperature [Celsius]', fontsize=12)
-        plt.ylabel('Counts', fontsize=12)
-        plt.xticks(fontsize=12)
-        Cosmicremoval_class.Savefig_config(os.path.join(paths['Temperatures'], temp_name))
-
-        # SUM MASKS plotting
-        plot_name = f'all_masks.pdf'
-        plt.imshow(sum_masks, interpolation='none')
-        plt.title('Addition of all masks')
-        plt.colorbar()
-        Cosmicremoval_class.Savefig_config(os.path.join(paths['Masks'], plot_name))
-
-    def Plotting_special(self, paths, chunks, chunks_mask):
-        """ Function to plot weird histograms, i.e. pixels that are flagged as cosmics "too" many times"""
-        sum_masks = np.sum(chunks_mask, axis=0)
-
-        # To check which pixels are flagged too much
-        indexes = np.argwhere(sum_masks > 0.1 * len(chunks_mask))
-
-        # Histograms to look at what's happening
-        for index in indexes:
-            data = np.copy(chunks[:, index[0], index[1]])
-            bins = self.Bins(data)
-
-            hist, bin_edges = np.histogram(data, bins=bins)
-            max_bin_index = np.argmax(hist)
-            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-            mode = bin_centers[max_bin_index]
-
-            # Determination of the mode absolute deviation
-            mad = np.mean(np.abs(data - mode))
-
-            # REF HISTO plotting
-            histo_name = f'specialhisto_r{index[0]}_c{index[1]}.png'
-            plt.hist(data, bins=bins)
-            plt.axvline(mode - self.coef * mad, color='red', linestyle='--', label='Clipping value')
-            plt.axvline(mode + self.coef * mad, color='red', linestyle='--')
-            plt.title(f'mode: {round(mode, 2)}; mad: {round(mad, 2)}.')
-            plt.xlabel('Detector count')
-            plt.ylabel('Frequency')
-            plt.xticks(fontsize=12)
-            plt.legend(loc=1)
-            Cosmicremoval_class.Savefig_config(os.path.join(paths['Special histograms'], histo_name))
-
-    def Medianplotting(self, paths, files, data, masks, mode):
-        """ Function to plot the data for the acquisitions that were done in sets"""
-        data_med = np.median(data, axis=0)
-        med_dif = data - data_med
-        img = np.copy(data)
-        modes = np.zeros_like(data)
-        modes[:] = mode
-        img[masks] = modes[masks]
-        med_difnw = img - data_med
-
-        for loop, image in enumerate(data):
-            # Initialisation
-            file = files[loop]
-            mask = masks[loop]
-            lines = self.Contours(mask)
-            name_dict = common.SpiceUtils.parse_filename(file)
-            date = parse_date(name_dict['time'])
-
-            SPIOBSID = name_dict['SPIOBSID']
-
-            # Calculate the first and last percentiles of the image data
-            first_percentile = np.percentile(image, 1)
-            last_percentile = np.percentile(image, 99.99)
-            if first_percentile < 100:
-                first_percentile = 100
-
-            # # DIF MEDIAN plotting
-            # plot_name = f'Dif_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # plt.imshow(med_dif[loop], interpolation='none', vmin=-100, vmax=400)
-            # plt.title(f"Dif with median: {file}")
-            # plt.colorbar()
-            # plt.savefig(os.path.join(paths['Medians'], plot_name))
-            # # plot_name = f'Dif_cont_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # # for line in lines:
-            # #     plt.plot(line[1], line[0], color='r', linewidth=0.05)
-            # # plt.savefig(os.path.join(paths['Medians'], plot_name))
-            # plt.close()
-
-            # # DARKS plotting
-            # plot_name = f'Dark_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # plt.imshow(image, interpolation='none')
-            # plt.title(f'Dark: {file}')
-            # plt.colorbar()
-            # plt.savefig(os.path.join(paths['Darks'], plot_name))
-            # plot_name = f'Dark_cont_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # for line in lines:
-            #     plt.plot(line[1], line[0], color='r', linewidth=0.05)
-            # plt.savefig(os.path.join(paths['Darks'], plot_name))
-            # plt.close()
-            #
-            # # LOG DARKS plotting
-            # plot_name = f'Log_dark_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # fig = plt.imshow(image, interpolation='none')
-            # plt.title(f'Dark: {file}')
-            # # Create a logarithmic colormap
-            # log_cmap = mcolors.LogNorm(vmin=first_percentile, vmax=last_percentile)
-            # fig.set_norm(log_cmap)
-            # cbar = plt.colorbar(fig)
-            # cbar.locator = ticker.MaxNLocator(nbins=5)  # Adjust the number of ticks as desired
-            # cbar.update_ticks()
-            # plt.savefig(os.path.join(paths['Darks'], plot_name))
-            # plot_name = f'Log_darkcont_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # for line in lines:
-            #     plt.plot(line[1], line[0], color='r', linewidth=0.05)
-            # plt.savefig(os.path.join(paths['Darks'], plot_name))
-            # plt.close()
-            #
-            # # FINAL plotting
-            # plot_name = f'Final_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # plt.imshow(img[loop], interpolation='none')
-            # plt.title(f'Final: {file}')
-            # plt.colorbar()
-            # plt.savefig(os.path.join(paths['Results'], plot_name))
-            # plot_name = f'Final_cont_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # for line in lines:
-            #     plt.plot(line[1], line[0], color='r', linewidth=0.05)
-            # plt.savefig(os.path.join(paths['Results'], plot_name))
-            # plt.close()
-            #
-            # # FINAL DIF MEDIAN plotting
-            # plot_name = f'Dif_nw_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # plt.imshow(med_difnw[loop], interpolation='none', vmin=-100, vmax=400)
-            # plt.title(f"Dif with median: {file}")
-            # plt.colorbar()
-            # plt.savefig(os.path.join(paths['Medians'], plot_name))
-            # plot_name = f'Dif_nwcont_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            # for line in lines:
-            #     plt.plot(line[1], line[0], color='r', linewidth=0.05)
-            # plt.savefig(os.path.join(paths['Medians'], plot_name))
-            # plt.close()
-
-    def Stats_plotting(self, paths, files, data, nw_masks):
-        data_med = np.median(data, axis=0)
-
-        for loop, image in enumerate(data):
-            file = files[loop]
-            nw_mask = nw_masks[loop]
-            lines = self.Contours(nw_mask)
-            name_dict = common.SpiceUtils.parse_filename(file)
-            date = parse_date(name_dict['time'])
-            med_difnw = image - data_med
-
-            # DARK ERROR plotting
-            dark_name = f'Dark_errors_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            plt.imshow(image, interpolation='none')
-            plt.title(f'Dark: {file}')
-            plt.colorbar()
-            for line in lines:
-                plt.plot(line[1], line[0], color='g', linewidth=0.05)
-            Cosmicremoval_class.Savefig_config(os.path.join(paths['Darks'], dark_name))
-
-            # MASK ERROR plotting
-            mask_name = f'Mask_errors_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            plt.imshow(nw_mask, interpolation='none')
-            plt.title(f'Errors: {file}')
-            Cosmicremoval_class.Savefig_config(os.path.join(paths['Masks'], mask_name))
-
-            # Final result plotting with errors
-            plot_name = f'Dif_errors_{date.year:04d}{date.month:02d}{date.day:02d}_H{date.hour:02d}_{loop:02d}.pdf'
-            plt.imshow(med_difnw, interpolation='none', vmin=-100, vmax=400)
-            for line in lines:
-                plt.plot(line[1], line[0], color='g', linewidth=0.05)
-            plt.colorbar()
-            Cosmicremoval_class.Savefig_config(os.path.join(paths['Medians'], plot_name))
-
-    ############################################# MISCELLANEOUS functions ##############################################
     def Bins(self, data):
         """Small function to calculate the appropriate bin count"""
         val_range = np.max(data) - np.min(data)
-        # bins = int(len(data) * val_range / 2000)  #was 500 before
-        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+        bins = int(len(data) * val_range / 500)  #was 500 before
+        # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if isinstance(bins, int):
-            if bins < 8:
-                bins = 8
+            if bins < 10:
+                bins = 10
 
         elif isinstance(bins, np.ndarray):
             if len(bins) < 8:
                 bins = 8
         return bins
-
-    @staticmethod
-    def Contours(mask):  # TODO: change this to a quicker method when all the other stuff is finished
-        """Function to plot the contours given a mask
-        Source: https://stackoverflow.com/questions/40892203/can-matplotlib-contours-match-pixel-edges"""
-        pad = np.pad(mask, [(1, 1), (1, 1)])  # zero padding
-        im0 = np.abs(np.diff(pad, n=1, axis=0))[:, 1:]
-        im1 = np.abs(np.diff(pad, n=1, axis=1))[1:, :]
-        lines = []
-        for ii, jj in np.ndindex(im0.shape):
-            if im0[ii, jj] == 1:
-                lines += [([ii - .5, ii - .5], [jj - .5, jj + .5])]
-            if im1[ii, jj] == 1:
-                lines += [([ii - .5, ii + .5], [jj - .5, jj - .5])]
-        return lines
-
-    @staticmethod
-    def Savefig_config(figname, **kwargs):
-        savefig_config = {'dpi': 1024 / 8, 'bbox_inches': 'tight'}
-        plt.yticks(fontsize=12)
-        plt.savefig(figname, **savefig_config, **kwargs)
-        plt.close()
 
 if __name__ == '__main__':
     mpl.rcParams['figure.figsize'] = (8, 8)
