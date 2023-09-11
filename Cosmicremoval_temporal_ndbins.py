@@ -24,7 +24,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12, bins=1):
+    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12, bins=500):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -44,7 +44,7 @@ class Cosmicremoval_class:
     def Paths(self, exposure='none', detector='none'):
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
-        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_{self.bins}nd_'
+        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_bins{self.bins}_'
                                               f'final_v2')
 
         if exposure != 'none':
@@ -552,8 +552,8 @@ class Cosmicremoval_class:
     def Bins(self, data):
         """Small function to calculate the appropriate bin count"""
         val_range = np.max(data) - np.min(data)
-        # bins = int(len(data) * val_range / 500)  #was 500 before
-        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+        bins = int(len(data) * val_range / 500)  #was 500 before
+        # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if isinstance(bins, int):
             if bins < 10:
                 bins = 10
