@@ -44,7 +44,7 @@ class Cosmicremoval_class:
     def Paths(self, exposure='none', detector='none'):
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
-        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_{self.bins}dn_'
+        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_bins2000_'
                                               f'final_v2')
 
         if exposure != 'none':
@@ -843,8 +843,8 @@ class Cosmicremoval_class:
     def Bins(self, data):
         """Small function to calculate the appropriate bin count"""
         val_range = np.max(data) - np.min(data)
-        # bins = int(len(data) * val_range / 500)  #was 500 before
-        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+        bins = int(len(data) * val_range / 2000)  #was 500 before
+        # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if len(bins) < 8:
             bins = 8
         return bins
