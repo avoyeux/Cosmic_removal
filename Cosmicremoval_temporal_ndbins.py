@@ -552,15 +552,15 @@ class Cosmicremoval_class:
     def Bins(self, data):
         """Small function to calculate the appropriate bin count"""
         val_range = np.max(data) - np.min(data)
-        bins = int(len(data) * val_range / 500)  #was 500 before
-        # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+        # bins = int(len(data) * val_range / 500)  #was 500 before
+        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if isinstance(bins, int):
             if bins < 10:
                 bins = 10
 
         elif isinstance(bins, np.ndarray):
-            if len(bins) < 8:
-                bins = 8
+            if len(bins) < 10:
+                bins = 10
         return bins
 
 if __name__ == '__main__':
