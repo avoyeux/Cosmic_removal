@@ -845,8 +845,13 @@ class Cosmicremoval_class:
         val_range = np.max(data) - np.min(data)
         # bins = int(len(data) * val_range / 2000)  #was 500 before
         bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
-        if len(bins) < 8:
-            bins = 8
+        if isinstance(bins, int):
+            if bins < 8:
+                bins = 8
+
+        elif isinstance(bins, np.ndarray):
+            if len(bins) < 8:
+                bins = 8
         return bins
 
     @staticmethod
