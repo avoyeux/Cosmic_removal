@@ -311,7 +311,9 @@ class Cosmicremoval_class:
                 plt.xlabel('Detector count', fontsize=12)
                 plt.ylabel('Frequency', fontsize=12)
                 plt.xticks(fontsize=12)
-                Cosmicremoval_class.Savefig_config(os.path.join(paths['Histograms'], hist_name))
+                plt.yticks(fontsize=12)
+                plt.savefig(os.path.join(paths['Histograms'], hist_name), bbox_inches='tight')
+                plt.close()
 
     def Percentages_stdnmad(self, exposure, detector, data, mad, mode):
         std_kept = np.zeros_like(data)
