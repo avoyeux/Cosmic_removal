@@ -24,7 +24,8 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12, bins=2000):
+    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12,
+                 bins=4000, min_bins=8):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -33,6 +34,7 @@ class Cosmicremoval_class:
         self.months_interval = months_interval  # time interval to consider in months
         self.min_files = min_files
         self.bins = bins
+        self.min_bins = min_bins
 
         # Miscellaneous
         self.ref_pixels = list(map(int, np.linspace(0, 1023, 2)))  # reference pixels for the init madmode calculations
@@ -45,7 +47,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_bins{self.bins}_'
-                                              f'newtry')
+                                              f'min{self.min_bins}_newtry')
 
         if exposure != 'none':
             exposure_path = os.path.join(main_path, f'Exposure{exposure}')
@@ -535,12 +537,12 @@ class Cosmicremoval_class:
         bins = int(len(data) * val_range / self.bins)  #was 500 before
         # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if isinstance(bins, int):
-            if bins < 10:
-                bins = 10
+            if bins < self.min_bins:
+                bins = self.min_bins
 
         elif isinstance(bins, np.ndarray):
-            if len(bins) < 10:
-                bins = 10
+            if len(bins) < self.min_bins:
+                bins = self.min_bins
         return bins
 
 if __name__ == '__main__':
