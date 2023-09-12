@@ -24,7 +24,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12):
+    def __init__(self, processes=2, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -44,7 +44,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_'
-                                              f'mean_oldv')
+                                              f'med_oldv')
 
         if exposure != 'none':
             exposure_path = os.path.join(main_path, f'Exposure{exposure}')
@@ -349,20 +349,13 @@ class Cosmicremoval_class:
         mode_array = np.zeros_like(mad_array)
         # masks = np.zeros_like(chunk, dtype='bool')
         masks = np.zeros_like(chunk, dtype='bool')
-        for r in range(chunk.shape[1]):
-            for c in range(chunk.shape[2]):
-                # Variable initialisation
-                data = chunk[:, r, c]
-                mean = np.mean(data)
+        med = np.median(chunk, axis=0)
+        mad = np.mean(np.abs(chunk - med), axis=0)
 
-                # Determination of the mean absolute deviation
-                mad = np.mean(np.abs(data - mean))
-                mad_array[r, c] = mad
-                mode_array[r, c] = mean
         # Mad clipping to get the chunk specific mask
-        masks_filter = chunk > self.coef * mad_array + mode_array
+        masks_filter = chunk > self.coef * mad + med
         masks[masks_filter] = True
-        return mad_array, mode_array, masks  # these are all the values for each chunk
+        return mad, med, masks  # these are all the values for each chunk
 
     def Chunks_func(self, images):
         """Function to fusion all the mode, mad and masks values from all the chunks"""
