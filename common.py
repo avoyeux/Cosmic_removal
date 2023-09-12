@@ -49,7 +49,7 @@ class SpiceUtils:
         Source: https://spice-wiki.ias.u-psud.fr/doku.php/data:data_analysis_manual:read_catalog_python
         """
         cat_file = os.path.join(
-            os.getenv('SOLO_ARCHIVE', '//idc-archive/SOLO'),
+            os.getenv('SOLO_ARCHIVE', '/archive/SOLAR-ORBITER'),
             'SPICE', 'fits', 'spice_catalog.txt')
         columns = list(pd.read_csv(cat_file, nrows=0).keys())
         date_columns = ['DATE-BEG', 'DATE', 'TIMAQUTC']
@@ -74,7 +74,7 @@ class SpiceUtils:
         date = parse_date(d['time'])
 
         fullpath = os.path.join(
-            os.getenv('SOLO_ARCHIVE', '//idc-archive/SOLO'),
+            os.getenv('SOLO_ARCHIVE', '/archive/SOLAR-ORBITER'),
             'SPICE', 'fits',
             'level' + d['level'].lstrip('L'),
             f'{date.year:04d}', f'{date.month:02d}', f'{date.day:02d}',
