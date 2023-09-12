@@ -296,24 +296,23 @@ class Cosmicremoval_class:
         # Finding the 2D indexes where errors have been found
         error2D = np.any(error_masks, axis=0)
         rows, cols = np.where(error2D)
-        a = -1
         for r, c in zip(rows, cols):
-            a += 1
+            data = np.copy(images[:, r, c])
+            bins = self.Bins(data)
 
-            if a % 5 == 0:
-                data = np.copy(images[:, r, c])
-                bins = self.Bins(data)
-
-                # REF HISTO plotting
-                hist_name = f'refhisto_r{r}_c{c}.png'
-                plt.hist(images[:, r, c], bins=bins)
-                plt.title(f'mode: {round(mode[r, c], 2)}; mad: {round(mad[r, c], 2)}.', fontsize=12)
-                plt.xlabel('Detector count', fontsize=12)
-                plt.ylabel('Frequency', fontsize=12)
-                plt.xticks(fontsize=12)
-                plt.yticks(fontsize=12)
-                plt.savefig(os.path.join(paths['Histograms'], hist_name), bbox_inches='tight')
-                plt.close()
+            # REF HISTO plotting
+            hist_name = f'refhisto_r{r}_c{c}.png'
+            plt.hist(images[:, r, c], bins=bins)
+            plt.title(f'mode: {round(mode[r, c], 2)}; mad: {round(mad[r, c], 2)}.', fontsize=12)
+            plt.xlabel('Detector count', fontsize=12)
+            plt.ylabel('Frequency', fontsize=12)
+            plt.axvline(mode[r, c] - self.coef * mad[r, c], color='red', linestyle='--', label='Clipping value')
+            plt.axvline(mode[r, c] + self.coef * mad[r, c], color='red', linestyle='--')
+            plt.xticks(fontsize=12)
+            plt.yticks(fontsize=12)
+            plt.legend()
+            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
+            plt.close()
 
     def Percentages_stdnmad(self, exposure, detector, data, mad, mode):
         std_kept = np.zeros_like(data)
