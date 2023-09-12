@@ -43,8 +43,8 @@ class Cosmicremoval_class:
     def Paths(self, exposure='none', detector='none'):
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
-        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_{self.bins}nd_'
-                                              f'min{self.min_bins}_mean_oldv')
+        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_'
+                                              f'mean_oldv')
 
         if exposure != 'none':
             exposure_path = os.path.join(main_path, f'Exposure{exposure}')
@@ -339,30 +339,6 @@ class Cosmicremoval_class:
 
         Pandasdata = pd.DataFrame(data_dict)
         return Pandasdata
-
-    def Madmode_list_ref(self, images):
-        """Function to get the mad and mode values for the reference pixels and the main and left lists"""
-
-        # Variable initialisation
-        ref_madarray = np.zeros_like(images[0, :, :])
-        ref_modearray = np.zeros_like(ref_madarray)
-        for r in self.ref_pixels:
-            for c in self.ref_pixels:
-                # Variable initialisation
-                data = images[:, r, c]
-                bins = self.Bins(data)
-
-                # Creating a histogram
-                hist, bin_edges = np.histogram(data, bins=bins)
-                max_bin_index = np.argmax(hist)
-                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-                mode = bin_centers[max_bin_index]
-
-                # Determination of the mode absolute deviation
-                mad = np.mean(np.abs(data - mode))
-                ref_madarray[r, c] = mad
-                ref_modearray[r, c] = mode
-        return ref_madarray, ref_modearray
 
     def Chunk_madmodemask(self, chunk):
         """Function to calculate the mad, mode and mask for a given chunk
