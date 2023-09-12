@@ -316,7 +316,7 @@ class Cosmicremoval_class:
             used_images = []
             rank = -1
             for loop2, file2 in enumerate(filenames):
-                name_dict = common.parse_date(file2)
+                name_dict = common.SpiceUtils.parse_filename(file2)
                 date = name_dict['time']
                 if date < date_min or date > date_max:
                     continue
