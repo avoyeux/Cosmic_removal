@@ -252,7 +252,7 @@ class Cosmicremoval_class:
             # print(f'Exp{exposure}_det{detector} -- Percentages saved to csv file.')
 
             mad, mode, chunks_masks = self.Chunks_func(images)
-
+            a = 0
             print(f'Exp{exposure}_det{detector} -- Starting chunks.')
             for SPIOBSID, files in same_darks.items():
                 if len(files) < 3:
@@ -264,7 +264,10 @@ class Cosmicremoval_class:
                 # Error calculations
                 nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio = self.Stats(data, masks,
                                                                                                             mode)
-
+                if a == 0:
+                    all_errormasks = nw_masks
+                else:
+                    all_errormasks = np.concatenate((all_errormasks, nw_masks), axis=0)
                 # # Saving the stats in a csv file
                 data_pandas = self.Unique_datadict(exposure, detector, files, mad, mode, detections, errors, ratio,
                                                    weights_tot, weights_error, weights_ratio)
@@ -273,6 +276,7 @@ class Cosmicremoval_class:
                 data_pandas_detector = pd.concat([data_pandas_detector, data_pandas])
             #print(f'Exp{exposure}_det{detector} -- Chunks finished and Median plotting done.')
 
+            self.Error_histo_plotting(paths, all_errormasks, images, mode, mad)
             # Combining the dictionaries
             # data_pandas_std = pd.concat([data_pandas_std, pandas_std])
             # data_pandas_mad = pd.concat([data_pandas_mad, pandas_mad])
@@ -286,6 +290,28 @@ class Cosmicremoval_class:
         # data_pandas_mad.to_csv(os.path.join(paths['Exposure'], mad_name), index=False)
         data_pandas_exposure.to_csv(os.path.join(paths['Exposure'], csv_name), index=False)
         #print(f'Exp{exposure} -- CSV files created')
+
+    def Error_histo_plotting(self, paths, error_masks, images, mode, mad):
+
+        # Finding the 2D indexes where errors have been found
+        error2D = np.any(error_masks, axis=0)
+        rows, cols = np.where(error2D)
+        a = -1
+        for r, c in zip(rows, cols):
+            a += 1
+
+            if a % 5 == 0:
+                data = np.copy(images[:, r, c])
+                bins = self.Bins(data)
+
+                # REF HISTO plotting
+                hist_name = f'refhisto_r{r}_c{c}.png'
+                plt.hist(images[:, r, c], bins=bins)
+                plt.title(f'mode: {round(mode[r, c], 2)}; mad: {round(mad[r, c], 2)}.', fontsize=12)
+                plt.xlabel('Detector count', fontsize=12)
+                plt.ylabel('Frequency', fontsize=12)
+                plt.xticks(fontsize=12)
+                Cosmicremoval_class.Savefig_config(os.path.join(paths['Histograms'], hist_name))
 
     def Percentages_stdnmad(self, exposure, detector, data, mad, mode):
         std_kept = np.zeros_like(data)
@@ -444,11 +470,8 @@ class Cosmicremoval_class:
         nw_data[masks] = modes[masks]
         nw_meds_dif = nw_data - data_med
 
-
         # Creating a new set of masks that shows where the method made an error
-        nw_masks = np.zeros_like(masks, dtype='bool')
-        filters = np.abs(nw_meds_dif) > np.abs(meds_dif)
-        nw_masks[filters] = True
+        nw_masks = np.abs(nw_meds_dif) > np.abs(meds_dif)
 
         ### MAIN STATS
         # Initialisation of the corresponding matrices
