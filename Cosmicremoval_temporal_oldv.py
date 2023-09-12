@@ -489,11 +489,11 @@ class Cosmicremoval_class:
         # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if isinstance(bins, int):
             if bins < self.min_bins:
-                bins = 8
+                bins = self.min_bins
 
         elif isinstance(bins, np.ndarray):
             if len(bins) < self.min_bins:
-                bins = 8
+                bins = self.min_bins
         return bins
 
 if __name__ == '__main__':
