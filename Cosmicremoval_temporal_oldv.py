@@ -25,7 +25,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12,
-                 bins=2000, min_bins=8):
+                 bins=1, min_bins=10):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -47,7 +47,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_{self.bins}nd_'
-                                              f'min{self.min_bins}_old_version')
+                                              f'min{self.min_bins}_old_version_histo')
 
         if exposure != 'none':
             exposure_path = os.path.join(main_path, f'Exposure{exposure}')
@@ -509,8 +509,8 @@ class Cosmicremoval_class:
     def Bins(self, data):
         """Small function to calculate the appropriate bin count"""
         val_range = np.max(data) - np.min(data)
-        bins = int(len(data) * val_range / self.bins)  #was 500 before
-        # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+        # bins = int(len(data) * val_range / self.bins)  #was 500 before
+        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if isinstance(bins, int):
             if bins < self.min_bins:
                 bins = self.min_bins
