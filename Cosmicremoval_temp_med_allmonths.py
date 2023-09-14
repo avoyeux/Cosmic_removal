@@ -214,6 +214,10 @@ class Cosmicremoval_class:
 
             if indexes[0] == last_time:
                 pandas_inter = pd.concat([pandas_inter, pandas_dict], ignore_index=True)
+                if indexes == args[-1]:
+                    pandas_name0 = f'Alldata_inter{indexes[0]}.csv'
+                    pandas_inter.to_csv(os.path.join(paths['Time interval'], pandas_name0), index=False)
+                    print(f'Inter{indexes[0]} -- CSV files created')
             else:
                 if first_try != 0:
                     paths = self.Paths(time_interval=last_time)
