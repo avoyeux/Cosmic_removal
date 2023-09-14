@@ -203,8 +203,10 @@ class Cosmicremoval_class:
         first_try = 0
 
         for loop, pandas_dict in enumerate(data_list):
-            time_int = pandas_dict['Time interval'][0]
-            exp = pandas_dict['Exposure time'][0]
+            time_ints = pandas_dict['Time interval']
+            time_int = time_ints[0]
+            exps = pandas_dict['Exposure time']
+            exp = exps[0]
             indexes = args[loop]
             print(f'loop is {loop}')
             print(f'time_int is: {time_int} and exp is: {exp}')
