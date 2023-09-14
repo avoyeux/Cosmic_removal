@@ -292,7 +292,6 @@ class Cosmicremoval_class:
         #print(f'Exp{exposure} -- CSV files created')
 
     def Error_histo_plotting(self, paths, error_masks, images, mode, mad):
-
         # Finding the 2D indexes where errors have been found
         error2D = np.any(error_masks, axis=0)
         rows, cols = np.where(error2D)
