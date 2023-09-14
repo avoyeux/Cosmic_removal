@@ -39,7 +39,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
-                                              f'_setmin{self.set_min}_mean_final')
+                                              f'_setmin{self.set_min}_med_final')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -268,17 +268,17 @@ class Cosmicremoval_class:
             for SPIOBSID, files in same_darks.items():
                 if len(files) < 3:
                     continue
-                data, mads, means, masks, nb_used = self.Time_interval(time_interval, exposure, detector, filenames,
+                data, mads, meds, masks, nb_used = self.Time_interval(time_interval, exposure, detector, filenames,
                                                                        files, images, positions, SPIOBSID)
                 if len(data) == 0:
                     continue
 
                 # Error calculations
                 nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio = self.Stats(data, masks,
-                                                                                                            means)
+                                                                                                            meds)
 
                 # # Saving the stats in a csv file
-                data_pandas = self.Unique_datadict(time_interval, exposure, detector, files, mads, means, detections,
+                data_pandas = self.Unique_datadict(time_interval, exposure, detector, files, mads, meds, detections,
                                                    errors, ratio, weights_tot, weights_error, weights_ratio, nb_used)
                 csv_name = f'Info_for_ID{SPIOBSID}.csv'
                 data_pandas.to_csv(os.path.join(paths['Statistics'], csv_name), index=False)
@@ -324,7 +324,7 @@ class Cosmicremoval_class:
 
         # Making a loop so that the acquisitions with the same ID are not taken into account for the mad and mode
         mads = []
-        means = []
+        meds = []
         masks = []
         nb_used_images = []
         for loop in range(len(files)):
@@ -353,17 +353,17 @@ class Cosmicremoval_class:
             mad, mean, chunks_masks = self.Chunks_func(nw_timeinit_images)
             image_index = index_n - len(delete1)
             mads.append(mad)
-            means.append(mean)
+            meds.append(mean)
             masks.append(chunks_masks[image_index])
             nb_used_images.append(nw_length)
         mads = np.array(mads)
-        means = np.array(means)
+        meds = np.array(meds)
         masks = np.array(masks)  # all the masks for the images with the same ID
         nb_used_images = np.array(nb_used_images)
 
         loops = positions[SPIOBSID]
         data = images[loops]  # all the images with the same ID
-        return data, mads, means, masks, nb_used_images
+        return data, mads, meds, masks, nb_used_images
 
     def Unique_datadict(self, time_interval, exposure, detector, files, mads, modes, detections, errors, ratio,
                         weights_tot, weights_error, weights_ratio, nb_used):
@@ -404,12 +404,12 @@ class Cosmicremoval_class:
         (i.e. spatial chunk with all the temporal values)"""
 
         # Variable initialisation
-        means = np.mean(chunk, axis=0)
-        mads = np.mean(np.abs(chunk - means), axis=0)
+        meds = np.median(chunk, axis=0)
+        mads = np.mean(np.abs(chunk - meds), axis=0)
 
         # Mad clipping to get the chunk specific mask
-        masks = chunk > self.coef * mads + means
-        return mads, means, masks  # these are all the values for each chunk
+        masks = chunk > self.coef * mads + meds
+        return mads, meds, masks  # these are all the values for each chunk
 
     def Chunks_func(self, images):
         """Function to fusion all the mode, mad and masks values from all the chunks"""
@@ -443,7 +443,7 @@ class Cosmicremoval_class:
             positions[SPIOBSID].append(loop)
         return same_darks, positions
 
-    def Stats(self, data, masks, means):
+    def Stats(self, data, masks, meds):
         """Function to calculate some stats to have an idea of the efficacy of the method. The output is a set of masks
         giving the positions where the method outputted a worst result than the initial image"""
 
@@ -453,7 +453,7 @@ class Cosmicremoval_class:
         meds_dif = data - data_med
 
         # Difference between the end result and the initial one
-        nw_data[masks] = means[masks]
+        nw_data[masks] = meds[masks]
         nw_meds_dif = nw_data - data_med
 
         # Creating a new set of masks that shows where the method made an error
