@@ -288,8 +288,7 @@ class Cosmicremoval_class:
         csv_name = f'Alldata_inter{time_interval}_exp{exposure}.csv'
         data_pandas_exposure.to_csv(os.path.join(paths['Exposure'], csv_name), index=False)
         print(f'Inter{time_interval}_exp{exposure} -- CSV files created')
-        print(f'initially time_inter is {data_pandas_exposure["Time interval"][0]}')
-        print(f' initially the other is {data_pandas_exposure["Exposure"]}')
+
         return data_pandas_exposure
 
     def Time_interval(self, date_interval, exposure, detector, filenames, files, images, positions, SPIOBSID):
