@@ -21,14 +21,14 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=30, min_files=12,
+    def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
                  time_intervals=np.arange(2, 25, 4)):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
         self.coef = coefficient
         self.min_filenb = min_filenb
-        self.min_files = min_files
+        self.set_min = set_min
         self.time_intervals = time_intervals
 
         # Code functions
@@ -38,7 +38,8 @@ class Cosmicremoval_class:
     def Paths(self, time_interval=-1, exposure=-1, detector=-1):
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
-        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_mean_final')
+        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
+                                              f'_setmin{self.set_min}mean_final')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -203,12 +204,13 @@ class Cosmicremoval_class:
         first_try = 0
 
         for loop, pandas_dict in enumerate(data_list):
-            time_int = pandas_dict['Time interval'][0]
-            exp = pandas_dict['Exposure time'][0]
             indexes = args[loop]
+            paths = self.Paths(time_interval=indexes[0], exposure=indexes[1])
 
-            print(f'time_int is: {time_int} and exp is: {exp}')
-            print(f'indexes[0] is: {indexes[0]} and indexes[1] is {indexes[1]}')
+            # Saving a csv file for each exposure time
+            csv_name = f'Alldata_inter{indexes[0]}_exp{indexes[1]}.csv'
+            pandas_dict.to_csv(os.path.join(paths['Exposure'], csv_name), index=False)
+            print(f'Inter{indexes[0]}_exp{indexes[1]} -- CSV files created')
 
             if indexes[0] == last_time:
                 pandas_inter = pd.concat([pandas_inter, pandas_dict], ignore_index=True)
@@ -217,6 +219,7 @@ class Cosmicremoval_class:
                     paths = self.Paths(time_interval=last_time)
                     pandas_name0 = f'Alldata_inter{last_time}.csv'
                     pandas_inter.to_csv(os.path.join(paths['Time interval'], pandas_name0), index=False)
+                    print(f'Inter{indexes[0]} -- CSV files created')
                 first_try = 1
                 last_time = indexes[0]
                 pandas_inter = pandas_dict
@@ -261,8 +264,8 @@ class Cosmicremoval_class:
             for SPIOBSID, files in same_darks.items():
                 if len(files) < 3:
                     continue
-                data, mads, means, masks = self.Time_interval(time_interval, exposure, detector, filenames, files,
-                                                              images, positions, SPIOBSID)
+                data, mads, means, masks, nb_used = self.Time_interval(time_interval, exposure, detector, filenames,
+                                                                       files, images, positions, SPIOBSID)
                 if len(data) == 0:
                     continue
 
@@ -272,7 +275,7 @@ class Cosmicremoval_class:
 
                 # # Saving the stats in a csv file
                 data_pandas = self.Unique_datadict(time_interval, exposure, detector, files, mads, means, detections,
-                                                   errors, ratio, weights_tot, weights_error, weights_ratio)
+                                                   errors, ratio, weights_tot, weights_error, weights_ratio, nb_used)
                 csv_name = f'Info_for_ID{SPIOBSID}.csv'
                 data_pandas.to_csv(os.path.join(paths['Statistics'], csv_name), index=False)
                 data_pandas_detector = pd.concat([data_pandas_detector, data_pandas], ignore_index=True)
@@ -281,11 +284,6 @@ class Cosmicremoval_class:
 
             # Combining the dictionaries
             data_pandas_exposure = pd.concat([data_pandas_exposure, data_pandas_detector], ignore_index=True)
-        # Saving a csv file for each exposure time
-        csv_name = f'Alldata_inter{time_interval}_exp{exposure}.csv'
-        data_pandas_exposure.to_csv(os.path.join(paths['Exposure'], csv_name), index=False)
-        print(f'Inter{time_interval}_exp{exposure} -- CSV files created')
-
         return data_pandas_exposure
 
     def Time_interval(self, date_interval, exposure, detector, filenames, files, images, positions, SPIOBSID):
@@ -324,6 +322,7 @@ class Cosmicremoval_class:
         mads = []
         means = []
         masks = []
+        nb_used_images = []
         for loop in range(len(files)):
             index_n = first_pos - position[0] + loop  # index of the image in the timeint_images array
 
@@ -337,13 +336,14 @@ class Cosmicremoval_class:
             delete_tot = np.concatenate((delete1, delete2), axis=0)
 
             nw_timeinit_images = np.delete(timeint_images, delete_tot, axis=0)  # Used images without the same IDs
+            nw_length = len(nw_timeinit_images)
 
             print(f'Inter{date_interval}_exp{exposure}_det{detector}_ID{SPIOBSID}'
-                  f' -- Nb of used files: {len(nw_timeinit_images)}')
+                  f' -- Nb of used files: {nw_length}')
 
-            if len(nw_timeinit_images) < self.min_files:
+            if nw_length < self.set_min:
                 print(f'\033[31mInter{date_interval}_exp{exposure}_det{detector}_ID{SPIOBSID} '
-                      f'-- Less than {self.min_files} files. Going to next SPIOBSID\033[0m')
+                      f'-- Less than {self.set_min} files. Going to next SPIOBSID\033[0m')
                 return [], [], [], []
 
             mad, mean, chunks_masks = self.Chunks_func(nw_timeinit_images)
@@ -351,16 +351,18 @@ class Cosmicremoval_class:
             mads.append(mad)
             means.append(mean)
             masks.append(chunks_masks[image_index])
+            nb_used_images.append(nw_length)
         mads = np.array(mads)
         means = np.array(means)
         masks = np.array(masks)  # all the masks for the images with the same ID
+        nb_used_images = np.array(nb_used_images)
 
         loops = positions[SPIOBSID]
         data = images[loops]  # all the images with the same ID
-        return data, mads, means, masks
+        return data, mads, means, masks, nb_used_images
 
     def Unique_datadict(self, time_interval, exposure, detector, files, mads, modes, detections, errors, ratio,
-                        weights_tot, weights_error, weights_ratio):
+                        weights_tot, weights_error, weights_ratio, nb_used):
         """Function to create a dictionary containing some useful information on each exposure times. This is
          done to save the stats in a csv file when the code finishes running."""
 
@@ -383,11 +385,12 @@ class Cosmicremoval_class:
                                                                 tot_detection, tot_error, tot_ratio, SPIOBSID]).T
 
         data_dict = {'Time interval': times, 'Exposure time': a, 'Detector': b, 'Group date': c,
-                     'Nb of files in group': d, 'Tot nb of detections': e, 'Tot nb of errors': f,
+                     'Nb of files with same ID': d, 'Tot nb of detections': e, 'Tot nb of errors': f,
                      'Ratio errors/detections': g, 'Filename': files, 'SPIOBSID': h, 'Average Mode': np.mean(modes),
-                     'Average mode absolute deviation': np.mean(mads), 'Nb of detections': detections,
-                     'Nb of errors': errors, 'Ratio': ratio, 'Weighted detections': weights_tot,
-                     'Weighted errors': weights_error, 'Weighted ratio': weights_ratio}
+                     'Average mode absolute deviation': np.mean(mads), 'Nb of used images': nb_used,
+                     'Nb of detections': detections, 'Nb of errors': errors, 'Ratio': ratio,
+                     'Weighted detections': weights_tot, 'Weighted errors': weights_error,
+                     'Weighted ratio': weights_ratio}
 
         Pandasdata = pd.DataFrame(data_dict)
         return Pandasdata
