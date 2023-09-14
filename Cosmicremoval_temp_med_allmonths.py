@@ -209,9 +209,6 @@ class Cosmicremoval_class:
 
             print(f'time_int is: {time_int} and exp is: {exp}')
             print(f'indexes[0] is: {indexes[0]} and indexes[1] is {indexes[1]}')
-            if time_int != indexes[0] or exp != indexes[1]:  #TODO: take this out when I have checked the data order
-                print("THE DATA ISN'T IN THE RIGHT ORDER. SYS.EXIT")
-                sys.exit()
 
             if indexes[0] == last_time:
                 pandas_inter = pd.concat([pandas_inter, pandas_dict], ignore_index=True)
