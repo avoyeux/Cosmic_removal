@@ -186,11 +186,11 @@ class Cosmicremoval_class:
                 for exposure in self.exposures:
                     paths = self.Paths(time_interval=time_inter, exposure=exposure)
                     data_pandas_exposure = self.Main(exposure, time_inter)
-                    data_pandas_interval = pd.concat([data_pandas_interval, data_pandas_exposure])
+                    data_pandas_interval = pd.concat([data_pandas_interval, data_pandas_exposure], ignore_index=True)
                     pandas_name0 = f'Alldata_inter{time_inter}_exp{exposure}.csv'
                     data_pandas_exposure.to_csv(os.path.join(paths['Exposure'], pandas_name0), index=False)
 
-                data_pandas_all = pd.concat([data_pandas_all, data_pandas_interval])
+                data_pandas_all = pd.concat([data_pandas_all, data_pandas_interval], ignore_index=True)
                 pandas_name1 = f'Alldata_inter{time_inter}.csv'
                 data_pandas_interval.to_csv(os.path.join(paths['Time interval'], pandas_name1), index=False)
 
@@ -203,26 +203,18 @@ class Cosmicremoval_class:
         first_try = 0
 
         for loop, pandas_dict in enumerate(data_list):
-            time_ints = pandas_dict['Time interval']
-            time_int = time_ints[0]
-            exps = pandas_dict['Exposure time']
-            exp = exps[0]
+            time_int = pandas_dict['Time interval'][0]
+            exp = pandas_dict['Exposure time'][0]
             indexes = args[loop]
-            paths = self.Paths(time_interval=indexes[0], exposure=indexes[1])
-            pd_name = f'Alldata_inter{indexes[0]}_exp{indexes[1]}.csv'
-            pandas_dict.to_csv(os.path.join(paths['Exposure'], pd_name), index=False)
 
-            print(f'loop is {loop}')
             print(f'time_int is: {time_int} and exp is: {exp}')
-            print(f'time_ints are: {time_ints}')
-            print(f'exps is: {exps}')
             print(f'indexes[0] is: {indexes[0]} and indexes[1] is {indexes[1]}')
             if time_int != indexes[0] or exp != indexes[1]:  #TODO: take this out when I have checked the data order
                 print("THE DATA ISN'T IN THE RIGHT ORDER. SYS.EXIT")
                 sys.exit()
 
             if indexes[0] == last_time:
-                pandas_inter = pd.concat([pandas_inter, pandas_dict])
+                pandas_inter = pd.concat([pandas_inter, pandas_dict], ignore_index=True)
             else:
                 if first_try != 0:
                     paths = self.Paths(time_interval=last_time)
@@ -243,7 +235,7 @@ class Cosmicremoval_class:
         #     pandas_inter_name = f'Alldata_inter{time_inter}.csv'
         #     pandas_inter.to_csv(os.path.join(paths['Time interval'], pandas_inter_name), index=False)
 
-        data_list = pd.concat(data_list)
+        data_list = pd.concat(data_list, ignore_index=True)
         pandas_name = 'Alldata.csv'
         data_list.to_csv(os.path.join(paths['Main'], pandas_name), index=False)
 
@@ -286,12 +278,12 @@ class Cosmicremoval_class:
                                                    errors, ratio, weights_tot, weights_error, weights_ratio)
                 csv_name = f'Info_for_ID{SPIOBSID}.csv'
                 data_pandas.to_csv(os.path.join(paths['Statistics'], csv_name), index=False)
-                data_pandas_detector = pd.concat([data_pandas_detector, data_pandas])
+                data_pandas_detector = pd.concat([data_pandas_detector, data_pandas], ignore_index=True)
             print(f'Inter{time_interval}_exp{exposure}_det{detector}'
                   f' -- Chunks finished and Median plotting done.')
 
             # Combining the dictionaries
-            data_pandas_exposure = pd.concat([data_pandas_exposure, data_pandas_detector])
+            data_pandas_exposure = pd.concat([data_pandas_exposure, data_pandas_detector], ignore_index=True)
         # Saving a csv file for each exposure time
         csv_name = f'Alldata_inter{time_interval}_exp{exposure}.csv'
         data_pandas_exposure.to_csv(os.path.join(paths['Exposure'], csv_name), index=False)
