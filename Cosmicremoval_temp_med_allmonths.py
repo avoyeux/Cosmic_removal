@@ -208,15 +208,18 @@ class Cosmicremoval_class:
             exps = pandas_dict['Exposure time']
             exp = exps[0]
             indexes = args[loop]
+            paths = self.Paths(time_interval=indexes[0], exposure=indexes[1])
+            pd_name = f'Alldata_inter{indexes[0]}_exp{indexes[1]}.csv'
+            pandas_dict.to_csv(os.path.join(paths['Exposure'], pd_name), index=False)
+
             print(f'loop is {loop}')
             print(f'time_int is: {time_int} and exp is: {exp}')
+            print(f'time_ints are: {time_ints}')
+            print(f'exps is: {exps}')
             print(f'indexes[0] is: {indexes[0]} and indexes[1] is {indexes[1]}')
             if time_int != indexes[0] or exp != indexes[1]:  #TODO: take this out when I have checked the data order
                 print("THE DATA ISN'T IN THE RIGHT ORDER. SYS.EXIT")
                 sys.exit()
-            paths = self.Paths(time_interval=indexes[0], exposure=indexes[1])
-            pd_name = f'Alldata_inter{indexes[0]}_exp{indexes[1]}.csv'
-            pandas_dict.to_csv(os.path.join(paths['Exposure'], pd_name), index=False)
 
             if indexes[0] == last_time:
                 pandas_inter = pd.concat([pandas_inter, pandas_dict])
@@ -290,7 +293,7 @@ class Cosmicremoval_class:
             # Combining the dictionaries
             data_pandas_exposure = pd.concat([data_pandas_exposure, data_pandas_detector])
         # Saving a csv file for each exposure time
-        csv_name = f'Info_for_exp{exposure}.csv'
+        csv_name = f'Alldata_inter{time_interval}_exp{exposure}.csv'
         data_pandas_exposure.to_csv(os.path.join(paths['Exposure'], csv_name), index=False)
         print(f'Inter{time_interval}_exp{exposure} -- CSV files created')
 
