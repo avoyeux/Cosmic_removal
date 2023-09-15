@@ -453,10 +453,10 @@ class Cosmicremoval_class:
         # masks = chunk > self.coef * mads + modes
         # return mads, modes, masks
         # Variable initialisation
+
         mad_array = np.zeros_like(chunk[0, :, :])
         mode_array = np.zeros_like(mad_array)
         # masks = np.zeros_like(chunk, dtype='bool')
-        masks = np.zeros_like(chunk, dtype='bool')
 
         for r in range(chunk.shape[1]):
             for c in range(chunk.shape[2]):
@@ -566,6 +566,9 @@ class Cosmicremoval_class:
         val_range = np.max(data) - np.min(data)
         # bins = int(len(data) * val_range / self.bins)  #was 500 before
         bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+
+        if len(bins) == 0:
+            bins = 2
 
         return bins
 
