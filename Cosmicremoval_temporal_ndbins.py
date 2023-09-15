@@ -162,7 +162,7 @@ class Cosmicremoval_class:
                 else:
                     temp = temp2
                 data = hdul[detector].data
-                images.append(np.double(data[0, :, :, 0]))
+                images.append(np.double(data[0, :, :, 0]).astype(int))
                 dsun.append(dist_SUN)
                 temps.append(temp)
                 dates.append(date)
