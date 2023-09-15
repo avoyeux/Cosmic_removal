@@ -20,8 +20,8 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=18, min_files=12,
-                 bins=5, min_bins=8):
+    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12,
+                 bins=1, min_bins=8):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
