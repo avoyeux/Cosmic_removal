@@ -2,7 +2,6 @@
 import os
 import sys
 import common
-from multiprocessing import Process
 import warnings
 import numpy as np
 import pandas as pd
@@ -11,9 +10,6 @@ import matplotlib as mpl
 from astropy.io import fits
 import multiprocessing as mp
 from collections import Counter
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import matplotlib.colors as mcolors
 from dateutil.parser import parse as parse_date
 
 
@@ -24,8 +20,8 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=200, min_files=12,
-                 bins=4000, min_bins=8):
+    def __init__(self, processes=7, chunk_nb=4, coefficient=6, min_filenb=30, months_interval=18, min_files=12,
+                 bins=1, min_bins=8):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -47,7 +43,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_bins{self.bins}_'
-                                              f'min{self.min_bins}_final_v2')
+                                              f'nonphisto')
 
         if exposure != 'none':
             exposure_path = os.path.join(main_path, f'Exposure{exposure}')
@@ -415,59 +411,73 @@ class Cosmicremoval_class:
         Pandasdata = pd.DataFrame(data_dict)
         return Pandasdata
 
-    def Madmode_list_ref(self, images):
-        """Function to get the mad and mode values for the reference pixels and the main and left lists"""
-
-        # Variable initialisation
-        ref_madarray = np.zeros_like(images[0, :, :])
-        ref_modearray = np.zeros_like(ref_madarray)
-        for r in self.ref_pixels:
-            for c in self.ref_pixels:
-                # Variable initialisation
-                data = images[:, r, c]
-                bins = self.Bins(data)
-
-                # Creating a histogram
-                hist, bin_edges = np.histogram(data, bins=bins)
-                max_bin_index = np.argmax(hist)
-                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-                mode = bin_centers[max_bin_index]
-
-                # Determination of the mode absolute deviation
-                mad = np.mean(np.abs(data - mode))
-                ref_madarray[r, c] = mad
-                ref_modearray[r, c] = mode
-        return ref_madarray, ref_modearray
+    # def Madmode_list_ref(self, images):
+    #     """Function to get the mad and mode values for the reference pixels and the main and left lists"""
+    #
+    #     # Variable initialisation
+    #     ref_madarray = np.zeros_like(images[0, :, :])
+    #     ref_modearray = np.zeros_like(ref_madarray)
+    #     for r in self.ref_pixels:
+    #         for c in self.ref_pixels:
+    #             # Variable initialisation
+    #             data = images[:, r, c]
+    #             bins = self.Bins(data)
+    #
+    #             # Creating a histogram
+    #             hist, bin_edges = np.histogram(data, bins=bins)
+    #             max_bin_index = np.argmax(hist)
+    #             bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    #             mode = bin_centers[max_bin_index]
+    #
+    #             # Determination of the mode absolute deviation
+    #             mad = np.mean(np.abs(data - mode))
+    #             ref_madarray[r, c] = mad
+    #             ref_modearray[r, c] = mode
+    #     return ref_madarray, ref_modearray
+    def mode_along_axis(self, arr):
+        """Calculate mode for a 1D array."""
+        counts = np.bincount(arr)
+        return np.argmax(counts)
 
     def Chunk_madmodemask(self, chunk):
         """Function to calculate the mad, mode and mask for a given chunk
         (i.e. spatial chunk with all the temporal values)"""
 
-        # Variable initialisation
-        mad_array = np.zeros_like(chunk[0, :, :])
-        mode_array = np.zeros_like(mad_array)
-        # masks = np.zeros_like(chunk, dtype='bool')
-        masks = np.zeros_like(chunk, dtype='bool')
-        for r in range(chunk.shape[1]):
-            for c in range(chunk.shape[2]):
-                # Variable initialisation
-                data = chunk[:, r, c]
-                bins = self.Bins(data)
+        # Preprocess data for binning
+        binned_arr = (chunk // self.bins) * self.bins
+        # Compute mode for each 1D slice along axis=0
+        modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr)
+        mads = np.mean(np.abs(chunk - modes), axis=0)
 
-                # Creating a histogram
-                hist, bin_edges = np.histogram(data, bins=bins)
-                max_bin_index = np.argmax(hist)
-                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-                mode = bin_centers[max_bin_index]
-
-                # Determination of the mode absolute deviation
-                mad = np.mean(np.abs(data - mode))
-                mad_array[r, c] = mad
-                mode_array[r, c] = mode
         # Mad clipping to get the chunk specific mask
-        masks_filter = chunk > self.coef * mad_array + mode_array
-        masks[masks_filter] = True
-        return mad_array, mode_array, masks  # these are all the values for each chunk
+        masks = chunk > self.coef * mads + modes
+        return mads, modes, masks
+        # # Variable initialisation
+        # mad_array = np.zeros_like(chunk[0, :, :])
+        # mode_array = np.zeros_like(mad_array)
+        # # masks = np.zeros_like(chunk, dtype='bool')
+        # masks = np.zeros_like(chunk, dtype='bool')
+        #
+        # for r in range(chunk.shape[1]):
+        #     for c in range(chunk.shape[2]):
+        #         # Variable initialisation
+        #         data = chunk[:, r, c]
+        #         bins = self.Bins(data)
+        #
+        #         # Creating a histogram
+        #         hist, bin_edges = np.histogram(data, bins=bins)
+        #         max_bin_index = np.argmax(hist)
+        #         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        #         mode = bin_centers[max_bin_index]
+        #
+        #         # Determination of the mode absolute deviation
+        #         mad = np.mean(np.abs(data - mode))
+        #         mad_array[r, c] = mad
+        #         mode_array[r, c] = mode
+        # # Mad clipping to get the chunk specific mask
+        # masks_filter = chunk > self.coef * mad_array + mode_array
+        # # masks[masks_filter] = True
+        # return mad_array, mode_array, masks  # these are all the values for each chunk
 
     def Chunks_func(self, images):
         """Function to fusion all the mode, mad and masks values from all the chunks"""
@@ -551,19 +561,19 @@ class Cosmicremoval_class:
         return nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio
 
     ################################################ PLOTTING functions ################################################
-    def Bins(self, data):
-        """Small function to calculate the appropriate bin count"""
-        val_range = np.max(data) - np.min(data)
-        bins = int(len(data) * val_range / self.bins)  #was 500 before
-        # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
-        if isinstance(bins, int):
-            if bins < self.min_bins:
-                bins = self.min_bins
-
-        elif isinstance(bins, np.ndarray):
-            if len(bins) < self.min_bins:
-                bins = self.min_bins
-        return bins
+    # def Bins(self, data):
+    #     """Small function to calculate the appropriate bin count"""
+    #     val_range = np.max(data) - np.min(data)
+    #     bins = int(len(data) * val_range / self.bins)  #was 500 before
+    #     # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+    #     if isinstance(bins, int):
+    #         if bins < self.min_bins:
+    #             bins = self.min_bins
+    #
+    #     elif isinstance(bins, np.ndarray):
+    #         if len(bins) < self.min_bins:
+    #             bins = self.min_bins
+    #     return bins
 
 if __name__ == '__main__':
     mpl.rcParams['figure.figsize'] = (8, 8)
