@@ -434,10 +434,10 @@ class Cosmicremoval_class:
     #             ref_madarray[r, c] = mad
     #             ref_modearray[r, c] = mode
     #     return ref_madarray, ref_modearray
-    def mode_along_axis(self, arr):
-        """Calculate mode for a 1D array."""
-        counts = np.bincount(arr)
-        return np.argmax(counts)
+    # def mode_along_axis(self, arr):
+    #     """Calculate mode for a 1D array."""
+    #     counts = np.bincount(arr)
+    #     return np.argmax(counts)
 
     def Chunk_madmodemask(self, chunk):
         """Function to calculate the mad, mode and mask for a given chunk
@@ -567,8 +567,8 @@ class Cosmicremoval_class:
         # bins = int(len(data) * val_range / self.bins)  #was 500 before
         bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
 
-        if len(bins) == 0:
-            bins = 2
+        if len(bins) < 8:
+            bins = 8
 
         return bins
 
