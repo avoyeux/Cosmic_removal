@@ -43,7 +43,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_{self.months_interval}months_bins{self.bins}_'
-                                              f'nonphisto')
+                                              f'final_v2')
 
         if exposure != 'none':
             exposure_path = os.path.join(main_path, f'Exposure{exposure}')
@@ -443,41 +443,41 @@ class Cosmicremoval_class:
         """Function to calculate the mad, mode and mask for a given chunk
         (i.e. spatial chunk with all the temporal values)"""
 
-        # Preprocess data for binning
-        binned_arr = (chunk // self.bins) * self.bins
-        # Compute mode for each 1D slice along axis=0
-        modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr)
-        mads = np.mean(np.abs(chunk - modes), axis=0)
-
-        # Mad clipping to get the chunk specific mask
-        masks = chunk > self.coef * mads + modes
-        return mads, modes, masks
-        # # Variable initialisation
-        # mad_array = np.zeros_like(chunk[0, :, :])
-        # mode_array = np.zeros_like(mad_array)
-        # # masks = np.zeros_like(chunk, dtype='bool')
-        # masks = np.zeros_like(chunk, dtype='bool')
+        # # Preprocess data for binning
+        # binned_arr = (chunk // self.bins) * self.bins
+        # # Compute mode for each 1D slice along axis=0
+        # modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr)
+        # mads = np.mean(np.abs(chunk - modes), axis=0)
         #
-        # for r in range(chunk.shape[1]):
-        #     for c in range(chunk.shape[2]):
-        #         # Variable initialisation
-        #         data = chunk[:, r, c]
-        #         bins = self.Bins(data)
-        #
-        #         # Creating a histogram
-        #         hist, bin_edges = np.histogram(data, bins=bins)
-        #         max_bin_index = np.argmax(hist)
-        #         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        #         mode = bin_centers[max_bin_index]
-        #
-        #         # Determination of the mode absolute deviation
-        #         mad = np.mean(np.abs(data - mode))
-        #         mad_array[r, c] = mad
-        #         mode_array[r, c] = mode
         # # Mad clipping to get the chunk specific mask
-        # masks_filter = chunk > self.coef * mad_array + mode_array
-        # # masks[masks_filter] = True
-        # return mad_array, mode_array, masks  # these are all the values for each chunk
+        # masks = chunk > self.coef * mads + modes
+        # return mads, modes, masks
+        # Variable initialisation
+        mad_array = np.zeros_like(chunk[0, :, :])
+        mode_array = np.zeros_like(mad_array)
+        # masks = np.zeros_like(chunk, dtype='bool')
+        masks = np.zeros_like(chunk, dtype='bool')
+
+        for r in range(chunk.shape[1]):
+            for c in range(chunk.shape[2]):
+                # Variable initialisation
+                data = chunk[:, r, c]
+                bins = self.Bins(data)
+
+                # Creating a histogram
+                hist, bin_edges = np.histogram(data, bins=bins)
+                max_bin_index = np.argmax(hist)
+                bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+                mode = bin_centers[max_bin_index]
+
+                # Determination of the mode absolute deviation
+                mad = np.mean(np.abs(data - mode))
+                mad_array[r, c] = mad
+                mode_array[r, c] = mode
+        # Mad clipping to get the chunk specific mask
+        masks = chunk > self.coef * mad_array + mode_array
+        # masks[masks_filter] = True
+        return mad_array, mode_array, masks  # these are all the values for each chunk
 
     def Chunks_func(self, images):
         """Function to fusion all the mode, mad and masks values from all the chunks"""
@@ -561,19 +561,13 @@ class Cosmicremoval_class:
         return nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio
 
     ################################################ PLOTTING functions ################################################
-    # def Bins(self, data):
-    #     """Small function to calculate the appropriate bin count"""
-    #     val_range = np.max(data) - np.min(data)
-    #     bins = int(len(data) * val_range / self.bins)  #was 500 before
-    #     # bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
-    #     if isinstance(bins, int):
-    #         if bins < self.min_bins:
-    #             bins = self.min_bins
-    #
-    #     elif isinstance(bins, np.ndarray):
-    #         if len(bins) < self.min_bins:
-    #             bins = self.min_bins
-    #     return bins
+    def Bins(self, data):
+        """Small function to calculate the appropriate bin count"""
+        val_range = np.max(data) - np.min(data)
+        # bins = int(len(data) * val_range / self.bins)  #was 500 before
+        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+
+        return bins
 
 if __name__ == '__main__':
     mpl.rcParams['figure.figsize'] = (8, 8)
