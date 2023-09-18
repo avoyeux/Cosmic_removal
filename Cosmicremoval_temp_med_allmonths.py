@@ -22,7 +22,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
-                 time_intervals=np.arange(2, 25, 4)):
+                 time_intervals=np.arange(25, 50, 4)):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -227,17 +227,6 @@ class Cosmicremoval_class:
                 first_try = 1
                 last_time = indexes[0]
                 pandas_inter = pandas_dict
-
-        # TODO: need to take this away if the code before this one works
-        # for time_inter in self.time_intervals:
-        #     pandas_inter = pd.DataFrame()
-        #     for expo in self.exposures:
-        #         paths = self.Paths(time_interval=time_inter, exposure=expo)
-        #         csv_name = f'Alldata_inter{time_inter}_exp{expo}.csv'
-        #         each_pandas = pd.read_csv(os.path.join(paths['Exposure'], csv_name))
-        #         pandas_inter = pd.concat([pandas_inter, each_pandas])
-        #     pandas_inter_name = f'Alldata_inter{time_inter}.csv'
-        #     pandas_inter.to_csv(os.path.join(paths['Time interval'], pandas_inter_name), index=False)
 
         data_list = pd.concat(data_list, ignore_index=True)
         pandas_name = 'Alldata.csv'
