@@ -42,7 +42,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
-                                              f'_nonphisto{self.bins}_nohisto{self.bins}_final_histoplotting8min')
+                                              f'_nohistob{self.bins}_final_histoplotting8min')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
