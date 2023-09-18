@@ -144,7 +144,7 @@ class Cosmicremoval_class:
             images = []
             for detector in range(2):
                 data = hdul[detector].data
-                images.append(np.double(data[0, :, :, 0]))
+                images.append(np.double(data[0, :, :, 0]).astype('int32'))
 
             all_images.append(images)
             all_files.append(file)
