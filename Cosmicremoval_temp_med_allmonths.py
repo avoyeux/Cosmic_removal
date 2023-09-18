@@ -29,8 +29,8 @@ class Cosmicremoval_class:
         self.coef = coefficient
         self.min_filenb = min_filenb
         self.set_min = set_min
-        self.time_intervals = time_intervals
-        # self.time_intervals = np.array([2, 6, 10, 14, 18, 22, 25, 29, 33, 37, 41, 45, 49])
+        # self.time_intervals = time_intervals
+        self.time_intervals = np.array([2, 6, 10, 14, 18, 22, 25, 29, 33, 37, 41, 45, 49])
         self.bins = bins
 
         # Code functions
@@ -41,7 +41,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
-                                              f'_setmin{self.set_min}_mean_final')
+                                              f'_nonphisto{self.bins}_mean_final')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -390,34 +390,34 @@ class Cosmicremoval_class:
         Pandasdata = pd.DataFrame(data_dict)
         return Pandasdata
 
-    def Chunk_madmeanmask(self, chunk):
-        """Function to calculate the mad, mode and mask for a given chunk
-        (i.e. spatial chunk with all the temporal values)"""
-
-        # Variable initialisation
-        meds = np.mean(chunk, axis=0)
-        mads = np.mean(np.abs(chunk - meds), axis=0)
-
-        # Mad clipping to get the chunk specific mask
-        masks = chunk > self.coef * mads + meds
-        return mads, meds, masks  # these are all the values for each chunk
+    # def Chunk_madmeanmask(self, chunk):
+    #     """Function to calculate the mad, mode and mask for a given chunk
+    #     (i.e. spatial chunk with all the temporal values)"""
+    #
+    #     # Variable initialisation
+    #     meds = np.mean(chunk, axis=0)
+    #     mads = np.mean(np.abs(chunk - meds), axis=0)
+    #
+    #     # Mad clipping to get the chunk specific mask
+    #     masks = chunk > self.coef * mads + meds
+    #     return mads, meds, masks  # these are all the values for each chunk
 
     def mode_along_axis(self, arr):
         counts = np.bincount(arr)
         return np.argmax(counts)
 
-    # def Chunk_madmeanmask(self, chunk):
-    #     """Function to calculate the mad, mode and mask for a given chunk
-    #     (i.e. spatial chunk with all the temporal values)"""
-    #     # Binning the data
-    #     binned_arr = (chunk // self.bins) * self.bins
-    #
-    #     modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr)
-    #     mads = np.mean(np.abs(chunk - modes), axis=0)
-    #
-    #     # Mad clipping to get the chunk specific mask
-    #     masks = chunk > self.coef * mads + modes
-    #     return mads, modes, masks  # these are all the values for each chunk
+    def Chunk_madmeanmask(self, chunk):
+        """Function to calculate the mad, mode and mask for a given chunk
+        (i.e. spatial chunk with all the temporal values)"""
+        # Binning the data
+        binned_arr = (chunk // self.bins) * self.bins
+
+        modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr)
+        mads = np.mean(np.abs(chunk - modes), axis=0)
+
+        # Mad clipping to get the chunk specific mask
+        masks = chunk > self.coef * mads + modes
+        return mads, modes, masks  # these are all the values for each chunk
 
     def Chunks_func(self, images):
         """Function to fusion all the mode, mad and masks values from all the chunks"""
