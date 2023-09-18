@@ -460,7 +460,7 @@ class Cosmicremoval_class:
         """Function to calculate the mad, mode and mask for a given chunk
         (i.e. spatial chunk with all the temporal values)"""
         meds = np.median(chunk, axis=0)
-        means = np.means(chunk, axis=0)
+        means = np.mean(chunk, axis=0)
 
         mads_meds = np.mean(np.abs(chunk - meds), axis=0)
         mads_means = np.mean(np.abs(chunk - means), axis=0)
