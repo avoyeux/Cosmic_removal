@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import itertools
 from simple_decorators import decorators
+import matplotlib.pyplot as plt
 import matplotlib as mpl
 from astropy.io import fits
 import multiprocessing as mp
@@ -41,7 +42,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
-                                              f'_nonphisto{self.bins}_nonphistob{self.bins}_final')
+                                              f'_nonphisto{self.bins}_nohisto{self.bins}_final_histoplotting8min')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -259,27 +260,64 @@ class Cosmicremoval_class:
             for SPIOBSID, files in same_darks.items():
                 if len(files) < 3:
                     continue
-                data, mads, meds, masks, nb_used = self.Time_interval(time_interval, exposure, detector, filenames,
-                                                                       files, images, positions, SPIOBSID)
+                data, mads, modes, masks, nb_used, meds, means, mad_meds, mad_means = \
+                    self.Time_interval(time_interval, exposure, detector, filenames, files, images, positions, SPIOBSID)
                 if len(data) == 0:
                     continue
 
                 # Error calculations
                 nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio = self.Stats(data, masks,
-                                                                                                            meds)
+                                                                                                            modes)
 
                 # # Saving the stats in a csv file
-                data_pandas = self.Unique_datadict(time_interval, exposure, detector, files, mads, meds, detections,
+                data_pandas = self.Unique_datadict(time_interval, exposure, detector, files, mads, modes, detections,
                                                    errors, ratio, weights_tot, weights_error, weights_ratio, nb_used)
                 csv_name = f'Info_for_ID{SPIOBSID}.csv'
                 data_pandas.to_csv(os.path.join(paths['Statistics'], csv_name), index=False)
                 data_pandas_detector = pd.concat([data_pandas_detector, data_pandas], ignore_index=True)
+
+                # Plotting the errors
+                self.Error_histo_plotting(paths, nw_masks, data, modes, mads, meds, means, mad_meds, mad_means)
+
             print(f'Inter{time_interval}_exp{exposure}_det{detector}'
                   f' -- Chunks finished and Median plotting done.')
 
             # Combining the dictionaries
             data_pandas_exposure = pd.concat([data_pandas_exposure, data_pandas_detector], ignore_index=True)
         return data_pandas_exposure
+
+    def Error_histo_plotting(self, paths, error_masks, images, modes, mads, meds, means, mad_meds, mad_means):
+        # Finding the 2D indexes where errors have been found
+        # error2D = np.any(error_masks, axis=0)
+        # rows, cols = np.where(error2D)
+        width, rows, cols = np.where(error_masks)
+        a = 0
+        for r, c, w in zip(width, rows,  cols):
+            a += 1
+            if a % 10 == 0:
+                data = np.copy(images[:, r, c])
+                bins = self.Bins(data)
+
+                # REF HISTO plotting
+                hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
+                plt.hist(data, bins=bins)
+                plt.title(f'Histogram of the same ID set', fontsize=12)
+                plt.xlabel('Detector count', fontsize=12)
+                plt.ylabel('Frequency', fontsize=12)
+                plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='red', linestyle='--',
+                            label='Clipping value')
+                plt.axvline(means[w, r, c] + self.coef * mad_means[w, r, c], color='blue', linestyle='--',
+                            label='Mean clipping value')
+                plt.axvline(meds[w, r, c] + self.coef * mad_meds[w, r, c], color='black', linestyle='--',
+                            label='Med clipping value')
+                plt.axvline(modes[w, r, c], color='red', linestyle='-', label='Used mode')
+                plt.axvline(means[w, r, c], color='blue', linestyle='-', label='Used data mean')
+                plt.axvline(meds[w, r, c], color='black', linesstyle='-', labels='Used data med')
+                plt.xticks(fontsize=12)
+                plt.yticks(fontsize=12)
+                plt.legend()
+                plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
+                plt.close()
 
     def Time_interval(self, date_interval, exposure, detector, filenames, files, images, positions, SPIOBSID):
         first_filename = files[0]
@@ -315,8 +353,12 @@ class Cosmicremoval_class:
 
         # Making a loop so that the acquisitions with the same ID are not taken into account for the mad and mode
         mads = []
-        meds = []
+        modes = []
         masks = []
+        meds = []
+        means = []
+        mad_meds = []
+        mad_means = []
         nb_used_images = []
         for loop in range(len(files)):
             index_n = first_pos - position[0] + loop  # index of the image in the timeint_images array
@@ -339,22 +381,30 @@ class Cosmicremoval_class:
             if nw_length < self.set_min:
                 print(f'\033[31mInter{date_interval}_exp{exposure}_det{detector}_ID{SPIOBSID} '
                       f'-- Less than {self.set_min} files. Going to next SPIOBSID\033[0m')
-                return [], [], [], []
+                return [], [], [], [], [], [], [], [], []
 
-            mad, mean, chunks_masks = self.Chunks_func(nw_timeinit_images)
+            mad, mode, chunks_masks, med, mean, mad_med, mad_mean = self.Chunks_func(nw_timeinit_images)
             image_index = index_n - len(delete1)
             mads.append(mad)
-            meds.append(mean)
+            modes.append(mode)
             masks.append(chunks_masks[image_index])
+            meds.append(med)
+            means.append(mean)
+            mad_meds.append(mad_med)
+            mad_means.append(mad_means)
             nb_used_images.append(nw_length)
         mads = np.array(mads)
-        meds = np.array(meds)
+        modes = np.array(modes)
         masks = np.array(masks)  # all the masks for the images with the same ID
+        meds= np.array(meds)
+        means = np.array(means)
+        mad_meds = np.array(mad_meds)
+        mad_means = np.array(mad_means)
         nb_used_images = np.array(nb_used_images)
 
         loops = positions[SPIOBSID]
         data = images[loops]  # all the images with the same ID
-        return data, mads, meds, masks, nb_used_images
+        return data, mads, modes, masks, nb_used_images, meds, means, mad_meds, mad_means
 
     def Unique_datadict(self, time_interval, exposure, detector, files, mads, modes, detections, errors, ratio,
                         weights_tot, weights_error, weights_ratio, nb_used):
@@ -409,6 +459,12 @@ class Cosmicremoval_class:
     def Chunk_madmeanmask(self, chunk):
         """Function to calculate the mad, mode and mask for a given chunk
         (i.e. spatial chunk with all the temporal values)"""
+        meds = np.median(chunk, axis=0)
+        means = np.means(chunk, axis=0)
+
+        mads_meds = np.mean(np.abs(chunk - meds), axis=0)
+        mads_means = np.mean(np.abs(chunk - means), axis=0)
+
         # Binning the data
         binned_arr = (chunk // self.bins) * self.bins
 
@@ -417,7 +473,7 @@ class Cosmicremoval_class:
 
         # Mad clipping to get the chunk specific mask
         masks = chunk > self.coef * mads + modes
-        return mads, modes, masks  # these are all the values for each chunk
+        return mads, modes, masks, meds, means, mads_meds, mads_means  # these are all the values for each chunk
 
     def Chunks_func(self, images):
         """Function to fusion all the mode, mad and masks values from all the chunks"""
@@ -426,16 +482,16 @@ class Cosmicremoval_class:
         chunks = np.split(images, self.chunk_nb, axis=1)
 
         # Creating the chunk specific mad, mode and mask arrays
-        chunks_mad, chunks_mode, chunks_mask = self.Chunk_madmeanmask(chunks[0])
+        chunks_mad, chunks_mode, chunks_mask, meds, means, mads_meds, mads_means = self.Chunk_madmeanmask(chunks[0])
         for loop in range(1, len(chunks)):
             chunk = chunks[loop]
-            chunk_mad, chunk_mode, chunk_mask = self.Chunk_madmeanmask(chunk)
+            chunk_mad, chunk_mode, chunk_mask, meds, means, mads_meds, mads_means = self.Chunk_madmeanmask(chunk)
 
             # Saving the data
             chunks_mad = np.concatenate((chunks_mad, chunk_mad), axis=0)  # (1024*1024 array)
             chunks_mode = np.concatenate((chunks_mode, chunk_mode), axis=0)
             chunks_mask = np.concatenate((chunks_mask, chunk_mask), axis=1)
-        return chunks_mad, chunks_mode, chunks_mask
+        return chunks_mad, chunks_mode, chunks_mask, meds, means, mads_meds, mads_means
 
     def Samedarks(self, filenames):
         # Dictionaries initialisation
@@ -497,6 +553,14 @@ class Cosmicremoval_class:
             ratio = np.array(ratio)
             weights_ratio = np.array(weights_ratio)
         return nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio
+
+    def Bins(self, data):
+        """Small function to calculate the appropriate bin count"""
+        val_range = np.max(data) - np.min(data)
+        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+        if len(bins) < 8:
+            bins = 8
+        return bins
 
 if __name__ == '__main__':
     mpl.rcParams['figure.figsize'] = (8, 8)
