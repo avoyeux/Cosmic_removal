@@ -39,7 +39,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
-                                              f'_setmin{self.set_min}_med_final')
+                                              f'_setmin{self.set_min}_mean_final')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -393,7 +393,7 @@ class Cosmicremoval_class:
         (i.e. spatial chunk with all the temporal values)"""
 
         # Variable initialisation
-        meds = np.median(chunk, axis=0)
+        meds = np.mean(chunk, axis=0)
         mads = np.mean(np.abs(chunk - meds), axis=0)
 
         # Mad clipping to get the chunk specific mask
