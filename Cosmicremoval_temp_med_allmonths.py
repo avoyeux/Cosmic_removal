@@ -22,7 +22,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
+    def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
                  time_intervals=np.arange(25, 50, 4), bins=3):
         # Inputs
         self.processes = processes
@@ -188,7 +188,6 @@ class Cosmicremoval_class:
                 data_pandas_interval = pd.DataFrame()
 
                 for exposure in self.exposures:
-                    print(f'exposures:{self.exposures}')
                     paths = self.Paths(time_interval=time_inter, exposure=exposure)
                     data_pandas_exposure = self.Main(time_inter, exposure)
                     data_pandas_interval = pd.concat([data_pandas_interval, data_pandas_exposure], ignore_index=True)
