@@ -293,7 +293,7 @@ class Cosmicremoval_class:
         width, rows, cols = np.where(error_masks)
         a = 0
 
-        if a < 3:
+        while a < 3:
             for r, c, w in zip(width, rows,  cols):
                 a += 1
                 data = np.copy(images[:, r, c])
