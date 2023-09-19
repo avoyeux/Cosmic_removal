@@ -188,8 +188,9 @@ class Cosmicremoval_class:
                 data_pandas_interval = pd.DataFrame()
 
                 for exposure in self.exposures:
+                    print(f'exposures:{self.exposures}')
                     paths = self.Paths(time_interval=time_inter, exposure=exposure)
-                    data_pandas_exposure = self.Main(exposure, time_inter)
+                    data_pandas_exposure = self.Main(time_inter, exposure)
                     data_pandas_interval = pd.concat([data_pandas_interval, data_pandas_exposure], ignore_index=True)
                     pandas_name0 = f'Alldata_inter{time_inter}_exp{exposure}.csv'
                     data_pandas_exposure.to_csv(os.path.join(paths['Exposure'], pandas_name0), index=False)
