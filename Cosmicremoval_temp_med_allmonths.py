@@ -22,7 +22,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
+    def __init__(self, processes=16, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
                  time_intervals=np.arange(25, 50, 4), bins=3):
         # Inputs
         self.processes = processes
@@ -42,7 +42,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
-                                              f'_nohistob{self.bins}_final_plottinghisto8min')
+                                              f'_nohistob{self.bins}_final_plottinghisto8min_{self.processes}cpu')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
