@@ -22,7 +22,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
+    def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
                  time_intervals=np.arange(25, 50, 4), bins=3):
         # Inputs
         self.processes = processes
@@ -460,18 +460,18 @@ class Cosmicremoval_class:
     def Chunk_madmeanmask(self, chunk):
         """Function to calculate the mad, mode and mask for a given chunk
         (i.e. spatial chunk with all the temporal values)"""
-        meds = np.median(chunk, axis=0)
-        means = np.mean(chunk, axis=0)
+        meds = np.median(chunk, axis=0).astype('float32')
+        means = np.mean(chunk, axis=0).astype('float32')
 
-        mads_meds = np.mean(np.abs(chunk - meds), axis=0)
-        mads_means = np.mean(np.abs(chunk - means), axis=0)
+        mads_meds = np.mean(np.abs(chunk - meds), axis=0).astype('float32')
+        mads_means = np.mean(np.abs(chunk - means), axis=0).astype('float32')
         # meds, means, mads_meds, mads_means = 0, 0, 0, 0
 
         # Binning the data
         binned_arr = (chunk // self.bins) * self.bins
 
-        modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr)
-        mads = np.mean(np.abs(chunk - modes), axis=0)
+        modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr).astype('float32')
+        mads = np.mean(np.abs(chunk - modes), axis=0).astype('float32')
 
         # Mad clipping to get the chunk specific mask
         masks = chunk > self.coef * mads + modes
