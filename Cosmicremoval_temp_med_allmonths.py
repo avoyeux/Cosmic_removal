@@ -23,7 +23,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
-                 time_intervals=np.arange(25, 50, 4), bins=3):
+                 time_intervals=np.arange(25, 50, 4), bins=10):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -42,7 +42,7 @@ class Cosmicremoval_class:
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
         main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
-                                              f'_nohistob{self.bins}_final_histoplotting_min_nwtry')
+                                              f'_nohistob{self.bins}_final')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -277,7 +277,7 @@ class Cosmicremoval_class:
                 data_pandas_detector = pd.concat([data_pandas_detector, data_pandas], ignore_index=True)
 
                 # Plotting the errors
-                self.Error_histo_plotting(paths, nw_masks, data, modes, mads, meds, means, mad_meds, mad_means)
+                # self.Error_histo_plotting(paths, nw_masks, data, modes, mads, meds, means, mad_meds, mad_means)
 
             print(f'Inter{time_interval}_exp{exposure}_det{detector}'
                   f' -- Chunks finished and Median plotting done.')
@@ -459,11 +459,12 @@ class Cosmicremoval_class:
     def Chunk_madmeanmask(self, chunk):
         """Function to calculate the mad, mode and mask for a given chunk
         (i.e. spatial chunk with all the temporal values)"""
-        meds = np.median(chunk, axis=0)
-        means = np.mean(chunk, axis=0)
-
-        mads_meds = np.mean(np.abs(chunk - meds), axis=0)
-        mads_means = np.mean(np.abs(chunk - means), axis=0)
+        # meds = np.median(chunk, axis=0)
+        # means = np.mean(chunk, axis=0)
+        #
+        # mads_meds = np.mean(np.abs(chunk - meds), axis=0)
+        # mads_means = np.mean(np.abs(chunk - means), axis=0)
+        meds, means, mads_meds, mads_means = 0, 0, 0, 0
 
         # Binning the data
         binned_arr = (chunk // self.bins) * self.bins
@@ -554,13 +555,13 @@ class Cosmicremoval_class:
             weights_ratio = np.array(weights_ratio)
         return nw_masks, detections, errors, ratio, weights_tot, weights_error, weights_ratio
 
-    def Bins(self, data):
-        """Small function to calculate the appropriate bin count"""
-        val_range = np.max(data) - np.min(data)
-        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
-        if len(bins) < 8:
-            bins = 8
-        return bins
+    # def Bins(self, data):
+    #     """Small function to calculate the appropriate bin count"""
+    #     val_range = np.max(data) - np.min(data)
+    #     bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
+    #     if len(bins) < 8:
+    #         bins = 8
+    #     return bins
 
 if __name__ == '__main__':
     mpl.rcParams['figure.figsize'] = (8, 8)
