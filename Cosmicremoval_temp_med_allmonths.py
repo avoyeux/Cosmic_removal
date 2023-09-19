@@ -293,32 +293,33 @@ class Cosmicremoval_class:
         width, rows, cols = np.where(error_masks)
         a = 0
 
-        while a < 3:
-            for r, c, w in zip(width, rows,  cols):
-                a += 1
-                data = np.copy(images[:, r, c])
-                bins = self.Bins(data)
+        for r, c, w in zip(width, rows,  cols):
+            a += 1
+            if a > 3:
+                break
+            data = np.copy(images[:, r, c])
+            bins = self.Bins(data)
 
-                # REF HISTO plotting
-                hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
-                plt.hist(data, bins=bins)
-                plt.title(f'Histogram of the same ID set', fontsize=12)
-                plt.xlabel('Detector count', fontsize=12)
-                plt.ylabel('Frequency', fontsize=12)
-                plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='red', linestyle='--',
-                            label='Clipping value')
-                plt.axvline(means[w, r, c] + self.coef * mad_means[w, r, c], color='blue', linestyle='--',
-                            label='Mean clipping value')
-                plt.axvline(meds[w, r, c] + self.coef * mad_meds[w, r, c], color='black', linestyle='--',
-                            label='Med clipping value')
-                plt.axvline(modes[w, r, c], color='red', linestyle='-', label='Used mode')
-                plt.axvline(means[w, r, c], color='blue', linestyle='-', label='Used data mean')
-                plt.axvline(meds[w, r, c], color='black', linesstyle='-', labels='Used data med')
-                plt.xticks(fontsize=12)
-                plt.yticks(fontsize=12)
-                plt.legend()
-                plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
-                plt.close()
+            # REF HISTO plotting
+            hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
+            plt.hist(data, bins=bins)
+            plt.title(f'Histogram of the same ID set', fontsize=12)
+            plt.xlabel('Detector count', fontsize=12)
+            plt.ylabel('Frequency', fontsize=12)
+            plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='red', linestyle='--',
+                        label='Clipping value')
+            plt.axvline(means[w, r, c] + self.coef * mad_means[w, r, c], color='blue', linestyle='--',
+                        label='Mean clipping value')
+            plt.axvline(meds[w, r, c] + self.coef * mad_meds[w, r, c], color='black', linestyle='--',
+                        label='Med clipping value')
+            plt.axvline(modes[w, r, c], color='red', linestyle='-', label='Used mode')
+            plt.axvline(means[w, r, c], color='blue', linestyle='-', label='Used data mean')
+            plt.axvline(meds[w, r, c], color='black', linesstyle='-', labels='Used data med')
+            plt.xticks(fontsize=12)
+            plt.yticks(fontsize=12)
+            plt.legend()
+            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
+            plt.close()
 
     def Time_interval(self, date_interval, exposure, detector, filenames, files, images, positions, SPIOBSID):
         first_filename = files[0]
