@@ -48,12 +48,12 @@ class SpiceUtils:
 
         Source: https://spice-wiki.ias.u-psud.fr/doku.php/data:data_analysis_manual:read_catalog_python
         """
-        test_path = os.path.join('archive', 'SOLAR-ORBITER', 'SPICE')
+        test_path = os.path.join('//idc-archive/SOLO', 'SPICE')
 
         if os.path.exists(test_path):
             main_path = test_path
         else:
-            main_path = os.path.join('//idc-archive/SOLO', 'SPICE')
+            main_path = os.path.join('archive', 'SOLAR-ORBITER', 'SPICE')
 
         cat_file = os.path.join(main_path, 'fits', 'spice_catalog.txt')
         columns = list(pd.read_csv(cat_file, nrows=0).keys())
@@ -78,12 +78,12 @@ class SpiceUtils:
         d = SpiceUtils.parse_filename(filename)
         date = parse_date(d['time'])
 
-        test_path = os.path.join('archive', 'SOLAR-ORBITER', 'SPICE')
+        test_path = os.path.join('//idc-archive/SOLO', 'SPICE')
 
         if os.path.exists(test_path):
             main_path = test_path
         else:
-            main_path = os.path.join('//idc-archive/SOLO', 'SPICE')
+            main_path = os.path.join('archive', 'SOLAR-ORBITER', 'SPICE')
 
         fullpath = os.path.join(main_path, 'fits', 'level' + d['level'].lstrip('L'), f'{date.year:04d}',
                                 f'{date.month:02d}', f'{date.day:02d}', filename)
