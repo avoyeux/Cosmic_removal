@@ -22,7 +22,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
+    def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
                  time_intervals=np.arange(25, 50, 4), bins=3):
         # Inputs
         self.processes = processes
@@ -41,7 +41,7 @@ class Cosmicremoval_class:
     def Paths(self, time_interval=-1, exposure=-1, detector=-1):
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
-        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}'
+        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}nsetmin{self.set_min}'
                                               f'_nohistob{self.bins}_final_plottinghisto8min_{self.processes}cpu')
 
         if time_interval != -1:
@@ -293,7 +293,7 @@ class Cosmicremoval_class:
         width, rows, cols = np.where(error_masks)
         a = 0
 
-        for r, c, w in zip(width, rows,  cols):
+        for w, r, c in zip(width, rows,  cols):
             a += 1
             if a > 3:
                 break
@@ -314,7 +314,7 @@ class Cosmicremoval_class:
                         label='Med clipping value')
             plt.axvline(modes[w, r, c], color='red', linestyle='-', label='Used mode')
             plt.axvline(means[w, r, c], color='blue', linestyle='-', label='Used data mean')
-            plt.axvline(meds[w, r, c], color='black', linesstyle='-', labels='Used data med')
+            plt.axvline(meds[w, r, c], color='black', linestyle='-', label='Used data med')
             plt.xticks(fontsize=12)
             plt.yticks(fontsize=12)
             plt.legend()
@@ -393,7 +393,7 @@ class Cosmicremoval_class:
             meds.append(med)
             means.append(mean)
             mad_meds.append(mad_med)
-            mad_means.append(mad_means)
+            mad_means.append(mad_mean)
             nb_used_images.append(nw_length)
         mads = np.array(mads)
         modes = np.array(modes)
