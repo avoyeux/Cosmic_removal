@@ -22,7 +22,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
+    def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
                  time_intervals=np.arange(25, 50, 4), bins=1):
         # Inputs
         self.processes = processes
@@ -41,8 +41,8 @@ class Cosmicremoval_class:
     def Paths(self, time_interval=-1, exposure=-1, detector=-1):
         """Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
-        main_path = os.path.join(os.getcwd(), f'Temporal_coef{self.coef}_filesmin{self.min_filenb}nsetmin{self.set_min}'
-                                              f'_nohistob{self.bins}_final_plottinghisto8min_{self.processes}cpu')
+        main_path = os.path.join(os.getcwd(), f'New_Temporal_coef{self.coef}_filesmin{self.min_filenb}'
+                                              f'nsetmin{self.set_min}_nohistob{self.bins}_final_plottinghisto8min')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -260,7 +260,7 @@ class Cosmicremoval_class:
             for SPIOBSID, files in same_darks.items():
                 if len(files) < 3:
                     continue
-                data, mads, modes, masks, nb_used, meds, means, mad_meds, mad_means = \
+                data, mads, modes, masks, nb_used, meds, means, mad_meds, mad_means, used_images = \
                     self.Time_interval(time_interval, exposure, detector, filenames, files, images, positions, SPIOBSID)
                 if len(data) == 0:
                     continue
@@ -277,7 +277,8 @@ class Cosmicremoval_class:
                 data_pandas_detector = pd.concat([data_pandas_detector, data_pandas], ignore_index=True)
 
                 # Plotting the errors
-                self.Error_histo_plotting(paths, nw_masks, data, modes, mads, meds, means, mad_meds, mad_means)
+                self.Error_histo_plotting(paths, nw_masks, data, modes, mads, meds, means, mad_meds, mad_means,
+                                          used_images)
 
             print(f'Inter{time_interval}_exp{exposure}_det{detector}'
                   f' -- Chunks finished and Median plotting done.')
@@ -286,7 +287,8 @@ class Cosmicremoval_class:
             data_pandas_exposure = pd.concat([data_pandas_exposure, data_pandas_detector], ignore_index=True)
         return data_pandas_exposure
 
-    def Error_histo_plotting(self, paths, error_masks, images, modes, mads, meds, means, mad_meds, mad_means):
+    def Error_histo_plotting(self, paths, error_masks, images, modes, mads, meds, means, mad_meds, mad_means,
+                             used_images):
         # Finding the 2D indexes where errors have been found
         # error2D = np.any(error_masks, axis=0)
         # rows, cols = np.where(error2D)
@@ -298,11 +300,13 @@ class Cosmicremoval_class:
             if a > 3:
                 break
             data = np.copy(images[:, r, c])
+            data_main = np.copy(used_images[w, :, r, c])
             bins = self.Bins(data)
 
             # REF HISTO plotting
             hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
-            plt.hist(data, bins=bins)
+            plt.hist(data, color='green', bins=bins, label="Same ID data")
+            plt.hist(data_main, color='blue', bins=bins, label='Used data for computation', alpha=0.5)
             plt.title(f'Histogram of the same ID set', fontsize=12)
             plt.xlabel('Detector count', fontsize=12)
             plt.ylabel('Frequency', fontsize=12)
@@ -362,6 +366,7 @@ class Cosmicremoval_class:
         mad_meds = []
         mad_means = []
         nb_used_images = []
+        used_images = []
         for loop in range(len(files)):
             index_n = first_pos - position[0] + loop  # index of the image in the timeint_images array
 
@@ -395,6 +400,7 @@ class Cosmicremoval_class:
             mad_meds.append(mad_med)
             mad_means.append(mad_mean)
             nb_used_images.append(nw_length)
+            used_images.append(nw_timeinit_images)
         mads = np.array(mads)
         modes = np.array(modes)
         masks = np.array(masks)  # all the masks for the images with the same ID
@@ -403,10 +409,11 @@ class Cosmicremoval_class:
         mad_meds = np.array(mad_meds)
         mad_means = np.array(mad_means)
         nb_used_images = np.array(nb_used_images)
+        used_images = np.array(used_images)
 
         loops = positions[SPIOBSID]
         data = images[loops]  # all the images with the same ID
-        return data, mads, modes, masks, nb_used_images, meds, means, mad_meds, mad_means
+        return data, mads, modes, masks, nb_used_images, meds, means, mad_meds, mad_means, used_images
 
     def Unique_datadict(self, time_interval, exposure, detector, files, mads, modes, detections, errors, ratio,
                         weights_tot, weights_error, weights_ratio, nb_used):
