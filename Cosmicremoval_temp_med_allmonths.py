@@ -337,9 +337,9 @@ class Cosmicremoval_class:
             hist_name = f'Error_ID{SPIOBSID}_w{w}_r{r}_c{c}_v2.png'
             plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
             bins = self.Bins(data_before)
-            plt.hist(data_before, bins=bins, label='Main data before acquisition', histtype='step', edgecolor='0.6')
+            plt.hist(data_before, bins=bins, label='Main data before acquisition', histtype='step', edgecolor='0.8')
             bins = self.Bins(data_after)
-            plt.hist(data_after, bins=bins, label='Main data after acquisition', histtype='step', edgecolor='0.2')
+            plt.hist(data_after, bins=bins, label='Main data after acquisition', histtype='step', edgecolor='0.4')
             bins = self.Bins(data[w])
             plt.hist(data[w], bins=bins, label='Studied acquisition', histtype='step', edgecolor='black')
             plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
@@ -417,8 +417,8 @@ class Cosmicremoval_class:
             delete_tot = np.concatenate((delete1, delete2), axis=0)
 
             #TODO: clean some of the stuff here after the histo understanding
-            delete_before = np.arange(0, delete1_end + 1)
-            delete_after = np.arange(delete2_init - 1, len(timeinit_images))
+            delete_before = np.arange(0, delete2_end)
+            delete_after = np.arange(delete1_init, len(timeinit_images))
             before_timeinit_images = np.delete(timeinit_images, delete_after, axis=0)
             after_timeinit_images = np.delete(timeinit_images, delete_before, axis=0)
             nw_timeinit_images = np.delete(timeinit_images, delete_tot, axis=0)  # Used images without the same IDs
