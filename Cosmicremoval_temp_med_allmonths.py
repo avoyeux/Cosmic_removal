@@ -349,7 +349,8 @@ class Cosmicremoval_class:
                 plt.hist(data_after, bins=bins, label='Main data after acquisition', histtype='step', edgecolor='0.4')
             bins = self.Bins(data[w])
             plt.hist(data[w], bins=bins, label='Studied acquisition', histtype='step', edgecolor='black')
-            plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
+            plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}, date {date.year:04d}-{date.month:02d}',
+                      fontsize=12)
             plt.xlabel('Detector count', fontsize=12)
             plt.ylabel('Frequency', fontsize=12)
             plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='magenta', linestyle='--',
