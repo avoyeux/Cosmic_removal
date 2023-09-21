@@ -304,7 +304,7 @@ class Cosmicremoval_class:
             data = np.copy(images[:, r, c])
             data_main = np.copy(used_images[w, :, r, c])
             bins = self.Bins(data)
-            print(f' data_main is {data_main}')
+            print(f'data_main is {data_main} for w,r,c {w}, {r}, {c}')
 
             # REF HISTO plotting
             hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
