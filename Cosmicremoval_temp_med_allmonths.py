@@ -303,12 +303,13 @@ class Cosmicremoval_class:
                 break
             data = np.copy(images[:, r, c])
             data_main = np.copy(used_images[w, :, r, c])
-            bins = self.Bins(data)
+            bins = self.Bins(data_main)
             print(f'data_main is {data_main} for w,r,c {w}, {r}, {c}')
 
             # REF HISTO plotting
             hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
             plt.hist(data_main, color='blue', bins=bins, label='Used data for computation', alpha=0.5)
+            bins = self.Bins(data)
             plt.hist(data, color='red', bins=bins, label="Same ID data", alpha=0.6)
             plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
             plt.xlabel('Detector count', fontsize=12)
@@ -337,6 +338,7 @@ class Cosmicremoval_class:
             plt.close()
 
             # REF HISTO plotting
+            bins = self.Bins(data_main)
             hist_name = f'Errorhistoall_w{w}_r{r}_c{c}.png'
             plt.hist(data_main, color='blue', bins=bins, label='Used data for computation', alpha=0.5)
             plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
