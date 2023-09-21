@@ -307,7 +307,7 @@ class Cosmicremoval_class:
 
             # REF HISTO plotting
             hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
-            plt.hist(data, color='green', bins=bins, label="Same ID data")
+            plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.7)
             plt.hist(data_main, color='blue', bins=bins, label='Used data for computation', alpha=0.5)
             plt.title(f'Histogram of the same ID set', fontsize=12)
             plt.xlabel('Detector count', fontsize=12)
