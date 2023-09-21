@@ -308,9 +308,10 @@ class Cosmicremoval_class:
 
             # REF HISTO plotting
             hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
-            plt.hist(data_main, color='blue', bins=bins, label='Used data for computation', alpha=0.5)
+            plt.hist(data_main, bins=bins, label='Used data for computation', alpha=0.5,
+                     histtype='step', edgecolor='red')
             bins = self.Bins(data)
-            plt.hist(data, color='red', bins=bins, label="Same ID data", alpha=0.6)
+            plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.6)
             plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
             plt.xlabel('Detector count', fontsize=12)
             plt.ylabel('Frequency', fontsize=12)
