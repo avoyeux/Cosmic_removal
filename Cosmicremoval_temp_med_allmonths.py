@@ -184,7 +184,7 @@ class Cosmicremoval_class:
         else:
             data_pandas_all = pd.DataFrame()
 
-            for time_inter in self.time_intervals:
+            for time_inter in self.time_intervals[::-1]:
                 data_pandas_interval = pd.DataFrame()
 
                 for exposure in self.exposures:
@@ -304,12 +304,13 @@ class Cosmicremoval_class:
             data = np.copy(images[:, r, c])
             data_main = np.copy(used_images[w, :, r, c])
             bins = self.Bins(data)
+            print(f' data_main is {data_main}')
 
             # REF HISTO plotting
             hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
-            plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.7)
             plt.hist(data_main, color='blue', bins=bins, label='Used data for computation', alpha=0.5)
-            plt.title(f'Histogram of the same ID set', fontsize=12)
+            plt.hist(data, color='red', bins=bins, label="Same ID data", alpha=0.6)
+            plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
             plt.xlabel('Detector count', fontsize=12)
             plt.ylabel('Frequency', fontsize=12)
             plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='red', linestyle='--',
