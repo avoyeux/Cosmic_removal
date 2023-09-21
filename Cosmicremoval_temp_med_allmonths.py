@@ -295,6 +295,8 @@ class Cosmicremoval_class:
         width, rows, cols = np.where(error_masks)
         a = 0
 
+        print(f'used_images shape is {used_images.shape}')
+        print(f'images shpae is {images.shape}')
         for w, r, c in zip(width, rows,  cols):
             a += 1
             if a > 3:
