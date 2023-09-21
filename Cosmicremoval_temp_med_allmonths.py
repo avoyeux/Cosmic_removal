@@ -297,7 +297,7 @@ class Cosmicremoval_class:
 
         for w, r, c in zip(width, rows,  cols):
             a += 1
-            if a % 10 == 0 and a < 31:
+            if a % 10 != 0 or a > 31:
                 break
             filename = files[w]
             name_dict = common.SpiceUtils.parse_filename(filename)
@@ -341,13 +341,11 @@ class Cosmicremoval_class:
             plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
             if len(data_before) != 0:
                 bins = self.Bins(data_before)
-                plt.hist(data_before, bins=bins,  histtype='step',
-                         edgecolor=(0.4, 0.8, 0.4, 0.6))
+                plt.hist(data_before, bins=bins, histtype='step', edgecolor=(0.4, 0.8, 0.4, 0.6))
                 plt.hist(data_before, bins=bins, label='Main data before acquisition', color=(0.4, 0.8, 0.4, 0.2))
             if len(data_after) != 0:
                 bins = self.Bins(data_after)
-                plt.hist(data_after, bins=bins, histtype='step',
-                         edgecolor=(0, 0.3, 0.7, 0.6))
+                plt.hist(data_after, bins=bins, histtype='step', edgecolor=(0, 0.3, 0.7, 0.6))
                 plt.hist(data_after, bins=bins, label='Main data after acquisition', color=(0, 0.3, 0.7, 0.2))
             bins = self.Bins(data[w])
             plt.hist(data[w], bins=bins, label='Studied acquisition', histtype='step', edgecolor='black')
