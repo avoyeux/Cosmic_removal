@@ -184,10 +184,10 @@ class Cosmicremoval_class:
         else:
             data_pandas_all = pd.DataFrame()
 
-            for time_inter in self.time_intervals[::-1]:
+            for time_inter in self.time_intervals:
                 data_pandas_interval = pd.DataFrame()
 
-                for exposure in self.exposures:
+                for exposure in self.exposures[::-1]:
                     paths = self.Paths(time_interval=time_inter, exposure=exposure)
                     data_pandas_exposure = self.Main(time_inter, exposure)
                     data_pandas_interval = pd.concat([data_pandas_interval, data_pandas_exposure], ignore_index=True)
