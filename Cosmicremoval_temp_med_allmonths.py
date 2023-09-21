@@ -23,7 +23,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     def __init__(self, processes=64, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
-                 time_intervals=np.arange(25, 50, 4), bins=10):
+                 time_intervals=np.arange(25, 50, 4), bins=1):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -441,18 +441,6 @@ class Cosmicremoval_class:
 
         Pandasdata = pd.DataFrame(data_dict)
         return Pandasdata
-
-    # def Chunk_madmeanmask(self, chunk):
-    #     """Function to calculate the mad, mode and mask for a given chunk
-    #     (i.e. spatial chunk with all the temporal values)"""
-    #
-    #     # Variable initialisation
-    #     meds = np.mean(chunk, axis=0)
-    #     mads = np.mean(np.abs(chunk - meds), axis=0)
-    #
-    #     # Mad clipping to get the chunk specific mask
-    #     masks = chunk > self.coef * mads + meds
-    #     return mads, meds, masks  # these are all the values for each chunk
 
     def mode_along_axis(self, arr):
         counts = np.bincount(arr)
