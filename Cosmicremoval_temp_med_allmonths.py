@@ -23,7 +23,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
-                 time_intervals=np.arange(25, 50, 4), bins=5):
+                 time_intervals=np.arange(25, 50, 4), bins=1):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -324,6 +324,22 @@ class Cosmicremoval_class:
             plt.axvline(meds[w, r, c], color='black', linestyle='-', label='Used data med')
             plt.xticks(fontsize=12)
             plt.yticks(fontsize=12)
+            plt.legend()
+            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
+            plt.close()
+
+            # REF HISTO plotting
+            hist_name = f'Errorhistosame_w{w}_r{r}_c{c}.png'
+            plt.hist(data, color='red', bins=bins, label="Same ID data", alpha=0.6)
+            plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
+            plt.legend()
+            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
+            plt.close()
+
+            # REF HISTO plotting
+            hist_name = f'Errorhistoall_w{w}_r{r}_c{c}.png'
+            plt.hist(data_main, color='blue', bins=bins, label='Used data for computation', alpha=0.5)
+            plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
             plt.legend()
             plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
             plt.close()
