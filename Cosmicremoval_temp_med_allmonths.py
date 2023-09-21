@@ -23,7 +23,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
-                 time_intervals=np.arange(25, 50, 4), bins=1):
+                 time_intervals=np.arange(25, 50, 4), bins=5):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
