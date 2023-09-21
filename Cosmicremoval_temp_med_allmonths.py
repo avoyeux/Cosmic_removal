@@ -390,7 +390,7 @@ class Cosmicremoval_class:
             if nw_length < self.set_min:
                 print(f'\033[31mInter{date_interval}_exp{exposure}_det{detector}_ID{SPIOBSID} '
                       f'-- Less than {self.set_min} files. Going to next SPIOBSID\033[0m')
-                return [], [], [], [], [], [], [], [], []
+                return [], [], [], [], [], [], [], [], [], []
 
             mad, mode, chunks_masks, med, mean, mad_med, mad_mean = self.Chunks_func(nw_timeinit_images)
             image_index = index_n - len(delete1)
