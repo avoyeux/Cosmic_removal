@@ -301,10 +301,12 @@ class Cosmicremoval_class:
             a += 1
             if a > 3:
                 break
+            before_used_array = before_used[w]
+            after_used_array = after_used[w]
             data = np.copy(images[:, r, c])
             data_main = np.copy(used_images[w, :, r, c])
-            data_before = np.copy(before_used[w, :, r, c])
-            data_after = np.copy(after_used[w, :, r, c])
+            data_before = np.copy(before_used_array[:, r, c])
+            data_after = np.copy(after_used_array[:, r, c])
 
             # REF HISTO plotting
             hist_name = f'Error_ID{SPIOBSID}_w{w}_r{r}_c{c}.png'
@@ -416,7 +418,7 @@ class Cosmicremoval_class:
 
             #TODO: clean some of the stuff here after the histo understanding
             delete_before = np.arange(0, delete1_end + 1)
-            delete_after = np.arange(delete2_init - 1, len(timeinit_images) + 1)
+            delete_after = np.arange(delete2_init - 1, len(timeinit_images))
             before_timeinit_images = np.delete(timeinit_images, delete_after, axis=0)
             after_timeinit_images = np.delete(timeinit_images, delete_before, axis=0)
             nw_timeinit_images = np.delete(timeinit_images, delete_tot, axis=0)  # Used images without the same IDs
@@ -452,8 +454,8 @@ class Cosmicremoval_class:
         mad_means = np.array(mad_means)
         nb_used_images = np.array(nb_used_images)
         used_images = np.array(used_images)
-        before_used_images = np.array(before_used_images)
-        after_used_images = np.array(after_used_images)
+        # before_used_images = np.array(before_used_images)
+        # after_used_images = np.array(after_used_images)
 
         loops = positions[SPIOBSID]
         data = images[loops]  # all the images with the same ID
