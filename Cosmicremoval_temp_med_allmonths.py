@@ -304,26 +304,24 @@ class Cosmicremoval_class:
             data = np.copy(images[:, r, c])
             data_main = np.copy(used_images[w, :, r, c])
             bins = self.Bins(data_main)
-            print(f'data_main is {data_main} for w,r,c {w}, {r}, {c}')
 
             # REF HISTO plotting
             hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
-            plt.hist(data_main, bins=bins, label='Used data for computation', alpha=0.5,
-                     histtype='step', edgecolor='red')
+            plt.hist(data_main, bins=bins, label='Used data for computation', histtype='step', edgecolor='black')
             bins = self.Bins(data)
-            plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.6)
+            plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
             plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
             plt.xlabel('Detector count', fontsize=12)
             plt.ylabel('Frequency', fontsize=12)
-            plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='red', linestyle='--',
+            plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='magenta', linestyle='--',
                         label='Clipping value')
-            plt.axvline(means[w, r, c] + self.coef * mad_means[w, r, c], color='blue', linestyle='--',
+            plt.axvline(means[w, r, c] + self.coef * mad_means[w, r, c], color='orange', linestyle='--',
                         label='Mean clipping value')
-            plt.axvline(meds[w, r, c] + self.coef * mad_meds[w, r, c], color='black', linestyle='--',
+            plt.axvline(meds[w, r, c] + self.coef * mad_meds[w, r, c], color='blue', linestyle='--',
                         label='Med clipping value')
-            plt.axvline(modes[w, r, c], color='red', linestyle='-', label='Used mode')
-            plt.axvline(means[w, r, c], color='blue', linestyle='-', label='Used data mean')
-            plt.axvline(meds[w, r, c], color='black', linestyle='-', label='Used data med')
+            plt.axvline(modes[w, r, c], color='magenta', linestyle='-', label='Used mode')
+            plt.axvline(means[w, r, c], color='orange', linestyle='-', label='Used data mean')
+            plt.axvline(meds[w, r, c], color='blue', linestyle='-', label='Used data med')
             plt.xticks(fontsize=12)
             plt.yticks(fontsize=12)
             plt.legend()
