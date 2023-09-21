@@ -336,10 +336,12 @@ class Cosmicremoval_class:
             # REF HISTO plotting
             hist_name = f'Error_ID{SPIOBSID}_w{w}_r{r}_c{c}_v2.png'
             plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
-            bins = self.Bins(data_before)
-            plt.hist(data_before, bins=bins, label='Main data before acquisition', histtype='step', edgecolor='0.8')
-            bins = self.Bins(data_after)
-            plt.hist(data_after, bins=bins, label='Main data after acquisition', histtype='step', edgecolor='0.4')
+            if len(data_before) != 0:
+                bins = self.Bins(data_before)
+                plt.hist(data_before, bins=bins, label='Main data before acquisition', histtype='step', edgecolor='0.8')
+            if len(data_after) != 0:
+                bins = self.Bins(data_after)
+                plt.hist(data_after, bins=bins, label='Main data after acquisition', histtype='step', edgecolor='0.4')
             bins = self.Bins(data[w])
             plt.hist(data[w], bins=bins, label='Studied acquisition', histtype='step', edgecolor='black')
             plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
