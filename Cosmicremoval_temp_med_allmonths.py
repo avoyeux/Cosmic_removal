@@ -23,7 +23,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
-                 time_intervals=np.arange(25, 50, 4), bins=1):
+                 time_intervals=np.arange(25, 50, 4), bins=5):
         # Inputs
         self.processes = processes
         self.chunk_nb = chunk_nb
@@ -260,7 +260,7 @@ class Cosmicremoval_class:
             for SPIOBSID, files in same_darks.items():
                 if len(files) < 3:
                     continue
-                data, mads, modes, masks, nb_used, meds, means, mad_meds, mad_means, used_images = \
+                data, mads, modes, masks, nb_used, meds, means, mad_meds, mad_means, used_images, before_used, after_used = \
                     self.Time_interval(time_interval, exposure, detector, filenames, files, images, positions, SPIOBSID)
                 if len(data) == 0:
                     continue
@@ -278,7 +278,7 @@ class Cosmicremoval_class:
 
                 # Plotting the errors
                 self.Error_histo_plotting(paths, nw_masks, data, modes, mads, meds, means, mad_meds, mad_means,
-                                          used_images)
+                                          used_images, before_used, after_used, SPIOBSID)
 
             print(f'Inter{time_interval}_exp{exposure}_det{detector}'
                   f' -- Chunks finished and Median plotting done.')
@@ -288,7 +288,7 @@ class Cosmicremoval_class:
         return data_pandas_exposure
 
     def Error_histo_plotting(self, paths, error_masks, images, modes, mads, meds, means, mad_meds, mad_means,
-                             used_images):
+                             used_images, before_used, after_used, SPIOBSID):
         # Finding the 2D indexes where errors have been found
         # error2D = np.any(error_masks, axis=0)
         # rows, cols = np.where(error2D)
@@ -303,11 +303,13 @@ class Cosmicremoval_class:
                 break
             data = np.copy(images[:, r, c])
             data_main = np.copy(used_images[w, :, r, c])
-            bins = self.Bins(data_main)
+            data_before = np.copy(before_used[w, :, r, c])
+            data_after = np.copy(after_used[w, :, r, c])
 
             # REF HISTO plotting
-            hist_name = f'Errorhisto_w{w}_r{r}_c{c}.png'
-            plt.hist(data_main, bins=bins, label='Used data for computation', histtype='step', edgecolor='black')
+            hist_name = f'Error_ID{SPIOBSID}_w{w}_r{r}_c{c}.png'
+            bins = self.Bins(data_main)
+            plt.hist(data_main, bins=bins, label='Main data', histtype='step', edgecolor='black')
             bins = self.Bins(data)
             plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
             plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
@@ -325,24 +327,35 @@ class Cosmicremoval_class:
             plt.xticks(fontsize=12)
             plt.yticks(fontsize=12)
             plt.legend()
-            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
+            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight', dpi=300)
             plt.close()
 
+            bins = self.Bins(data)
             # REF HISTO plotting
-            hist_name = f'Errorhistosame_w{w}_r{r}_c{c}.png'
-            plt.hist(data, color='red', bins=bins, label="Same ID data", alpha=0.6)
+            hist_name = f'Error_ID{SPIOBSID}_w{w}_r{r}_c{c}_v2.png'
+            plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
+            bins = self.Bins(data_before)
+            plt.hist(data_before, bins=bins, label='Main data before acquisition', histtype='step', edgecolor='0.6')
+            bins = self.Bins(data_after)
+            plt.hist(data_after, bins=bins, label='Main data after acquisition', histtype='step', edgecolor='0.2')
+            bins = self.Bins(data[w])
+            plt.hist(data[w], bins=bins, label='Studied acquisition', histtype='step', edgecolor='black')
             plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
+            plt.xlabel('Detector count', fontsize=12)
+            plt.ylabel('Frequency', fontsize=12)
+            plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='magenta', linestyle='--',
+                        label='Clipping value')
+            plt.axvline(means[w, r, c] + self.coef * mad_means[w, r, c], color='orange', linestyle='--',
+                        label='Mean clipping value')
+            plt.axvline(meds[w, r, c] + self.coef * mad_meds[w, r, c], color='blue', linestyle='--',
+                        label='Med clipping value')
+            plt.axvline(modes[w, r, c], color='magenta', linestyle='-', label='Used mode')
+            plt.axvline(means[w, r, c], color='orange', linestyle='-', label='Used data mean')
+            plt.axvline(meds[w, r, c], color='blue', linestyle='-', label='Used data med')
+            plt.xticks(fontsize=12)
+            plt.yticks(fontsize=12)
             plt.legend()
-            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
-            plt.close()
-
-            # REF HISTO plotting
-            bins = self.Bins(data_main)
-            hist_name = f'Errorhistoall_w{w}_r{r}_c{c}.png'
-            plt.hist(data_main, color='blue', bins=bins, label='Used data for computation', alpha=0.5)
-            plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
-            plt.legend()
-            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight')
+            plt.savefig(os.path.join(paths['Special histograms'], hist_name), bbox_inches='tight', dpi=300)
             plt.close()
 
     def Time_interval(self, date_interval, exposure, detector, filenames, files, images, positions, SPIOBSID):
@@ -375,7 +388,7 @@ class Cosmicremoval_class:
                 if file == files[-1]:
                     last_pos = loop  # global index of the last image with the same ID
         position = np.array(position)  # the positions of the files in the right time interval
-        timeint_images = images[position]  # the images in the time interval
+        timeinit_images = images[position]  # the images in the time interval
 
         # Making a loop so that the acquisitions with the same ID are not taken into account for the mad and mode
         mads = []
@@ -387,6 +400,8 @@ class Cosmicremoval_class:
         mad_means = []
         nb_used_images = []
         used_images = []
+        before_used_images = []
+        after_used_images = []
         for loop in range(len(files)):
             index_n = first_pos - position[0] + loop  # index of the image in the timeint_images array
 
@@ -399,7 +414,12 @@ class Cosmicremoval_class:
             delete2 = np.arange(delete2_init, delete2_end)
             delete_tot = np.concatenate((delete1, delete2), axis=0)
 
-            nw_timeinit_images = np.delete(timeint_images, delete_tot, axis=0)  # Used images without the same IDs
+            #TODO: clean some of the stuff here after the histo understanding
+            delete_before = np.arange(0, delete1_end + 1)
+            delete_after = np.arange(delete2_init - 1, len(timeinit_images) + 1)
+            before_timeinit_images = np.delete(timeinit_images, delete_after, axis=0)
+            after_timeinit_images = np.delete(timeinit_images, delete_before, axis=0)
+            nw_timeinit_images = np.delete(timeinit_images, delete_tot, axis=0)  # Used images without the same IDs
             nw_length = len(nw_timeinit_images)
 
             print(f'Inter{date_interval}_exp{exposure}_det{detector}_ID{SPIOBSID}'
@@ -408,7 +428,7 @@ class Cosmicremoval_class:
             if nw_length < self.set_min:
                 print(f'\033[31mInter{date_interval}_exp{exposure}_det{detector}_ID{SPIOBSID} '
                       f'-- Less than {self.set_min} files. Going to next SPIOBSID\033[0m')
-                return [], [], [], [], [], [], [], [], [], []
+                return [], [], [], [], [], [], [], [], [], [], [], []
 
             mad, mode, chunks_masks, med, mean, mad_med, mad_mean = self.Chunks_func(nw_timeinit_images)
             image_index = index_n - len(delete1)
@@ -421,6 +441,8 @@ class Cosmicremoval_class:
             mad_means.append(mad_mean)
             nb_used_images.append(nw_length)
             used_images.append(nw_timeinit_images)
+            before_used_images.append(before_timeinit_images)
+            after_used_images.append(after_timeinit_images)
         mads = np.array(mads)
         modes = np.array(modes)
         masks = np.array(masks)  # all the masks for the images with the same ID
@@ -430,10 +452,13 @@ class Cosmicremoval_class:
         mad_means = np.array(mad_means)
         nb_used_images = np.array(nb_used_images)
         used_images = np.array(used_images)
+        before_used_images = np.array(before_used_images)
+        after_used_images = np.array(after_used_images)
 
         loops = positions[SPIOBSID]
         data = images[loops]  # all the images with the same ID
-        return data, mads, modes, masks, nb_used_images, meds, means, mad_meds, mad_means, used_images
+        return data, mads, modes, masks, nb_used_images, meds, means, mad_meds, mad_means, used_images, \
+               before_used_images, after_used_images
 
     def Unique_datadict(self, time_interval, exposure, detector, files, mads, modes, detections, errors, ratio,
                         weights_tot, weights_error, weights_ratio, nb_used):
@@ -578,7 +603,6 @@ class Cosmicremoval_class:
 
     def Bins(self, data):
         """Small function to calculate the appropriate bin count"""
-        val_range = np.max(data) - np.min(data)
         bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
         if len(bins) < 8:
             bins = 8
