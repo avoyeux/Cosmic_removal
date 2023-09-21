@@ -278,7 +278,7 @@ class Cosmicremoval_class:
 
                 # Plotting the errors
                 self.Error_histo_plotting(paths, nw_masks, data, modes, mads, meds, means, mad_meds, mad_means,
-                                          used_images, before_used, after_used, SPIOBSID)
+                                          used_images, before_used, after_used, SPIOBSID, files)
 
             print(f'Inter{time_interval}_exp{exposure}_det{detector}'
                   f' -- Chunks finished and Median plotting done.')
@@ -288,7 +288,7 @@ class Cosmicremoval_class:
         return data_pandas_exposure
 
     def Error_histo_plotting(self, paths, error_masks, images, modes, mads, meds, means, mad_meds, mad_means,
-                             used_images, before_used, after_used, SPIOBSID):
+                             used_images, before_used, after_used, SPIOBSID, files):
         # Finding the 2D indexes where errors have been found
         # error2D = np.any(error_masks, axis=0)
         # rows, cols = np.where(error2D)
@@ -301,6 +301,10 @@ class Cosmicremoval_class:
             a += 1
             if a > 3:
                 break
+            filename = files[w]
+            name_dict = common.SpiceUtils.parse_filename(filename)
+            date = parse_date(name_dict['time'])
+
             before_used_array = before_used[w]
             after_used_array = after_used[w]
             data = np.copy(images[:, r, c])
@@ -314,7 +318,8 @@ class Cosmicremoval_class:
             plt.hist(data_main, bins=bins, label='Main data', histtype='step', edgecolor='black')
             bins = self.Bins(data)
             plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
-            plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}', fontsize=12)
+            plt.title(f'Histogram, tot {len(data_main)}, same ID {len(data)}, date {date.year:04d}-{date.month:02d}',
+                      fontsize=12)
             plt.xlabel('Detector count', fontsize=12)
             plt.ylabel('Frequency', fontsize=12)
             plt.axvline(modes[w, r, c] + self.coef * mads[w, r, c], color='magenta', linestyle='--',
@@ -338,7 +343,7 @@ class Cosmicremoval_class:
             plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
             if len(data_before) != 0:
                 bins = self.Bins(data_before)
-                plt.hist(data_before, bins=bins, label='Main data before acquisition', histtype='step', edgecolor='0.8')
+                plt.hist(data_before, bins=bins, label='Main data before acquisition', histtype='step', edgecolor='0.7')
             if len(data_after) != 0:
                 bins = self.Bins(data_after)
                 plt.hist(data_after, bins=bins, label='Main data after acquisition', histtype='step', edgecolor='0.4')
@@ -607,9 +612,7 @@ class Cosmicremoval_class:
 
     def Bins(self, data):
         """Small function to calculate the appropriate bin count"""
-        bins = np.array(range(int(np.min(data)), int(np.max(data)) + 2, self.bins))
-        if len(bins) < 8:
-            bins = 8
+        bins = np.arange(int(np.min(data)) - self.bins/2, int(np.max(data)) + self.bins, self.bins)
         return bins
 
 if __name__ == '__main__':
