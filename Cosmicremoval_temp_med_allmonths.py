@@ -297,7 +297,7 @@ class Cosmicremoval_class:
 
         for w, r, c in zip(width, rows,  cols):
             a += 1
-            if a % 10 != 0 or a > 31:
+            if a > 3:
                 break
             filename = files[w]
             name_dict = common.SpiceUtils.parse_filename(filename)
