@@ -342,7 +342,7 @@ class Cosmicremoval_class:
             if len(data_before) != 0:
                 bins = self.Bins(data_before)
                 plt.hist(data_before, bins=bins, histtype='step', edgecolor=(0.4, 0.8, 0.4, 0.6))
-                plt.hist(data_before, bins=bins, label='Main data before acquisition', color=(0.4, 0.8, 0.4, 0.2))
+                plt.hist(data_before, bins=bins, label='Main data before acquisition', color=(0.8, 0.3, 0.3, 0.2))
             if len(data_after) != 0:
                 bins = self.Bins(data_after)
                 plt.hist(data_after, bins=bins, histtype='step', edgecolor=(0, 0.3, 0.7, 0.6))
