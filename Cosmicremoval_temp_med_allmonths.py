@@ -22,7 +22,7 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=1, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
+    def __init__(self, processes=32, chunk_nb=4, coefficient=6, min_filenb=20, set_min=3,
                  time_intervals=np.arange(25, 50, 4), bins=5):
         # Inputs
         self.processes = processes
@@ -341,7 +341,7 @@ class Cosmicremoval_class:
             plt.hist(data, color='green', bins=bins, label="Same ID data", alpha=0.5)
             if len(data_before) != 0:
                 bins = self.Bins(data_before)
-                plt.hist(data_before, bins=bins, histtype='step', edgecolor=(0.4, 0.8, 0.4, 0.6))
+                plt.hist(data_before, bins=bins, histtype='step', edgecolor=(0.8, 0.3, 0.3, 0.6))
                 plt.hist(data_before, bins=bins, label='Main data before acquisition', color=(0.8, 0.3, 0.3, 0.2))
             if len(data_after) != 0:
                 bins = self.Bins(data_after)
