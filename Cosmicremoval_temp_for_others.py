@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 from astropy.io import fits
 from collections import Counter
+from typeguard import typechecked
 from simple_decorators import decorators
 from dateutil.parser import parse as parse_date
 
@@ -29,8 +30,9 @@ class Cosmicremoval_class:
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
-    def __init__(self, processes=16, coefficient=6, min_filenb=20, set_min=3,
-                 time_intervals=np.arange(25, 50, 4), bins=5, stats=True, plots=True):
+    @typechecked
+    def __init__(self, processes: int = 16, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 3,
+                time_intervals: np.ndarray = np.array([4, 40]), bins: int = 5, stats: bool = True, plots: bool = True):
         
         # Arguments
         self.processes = processes
@@ -40,7 +42,7 @@ class Cosmicremoval_class:
         self.stats = stats  # Bool to know if stats will be saved
         self.plots = plots  # boolean to know if plots will be saved
         # self.time_intervals = time_intervals
-        self.time_intervals = np.array([4, 40])
+        self.time_intervals = np.arange(2, 20, 2)
         self.bins = bins
 
         # Code functions
@@ -365,8 +367,8 @@ class Cosmicremoval_class:
 
         year_max = date.year
         year_min = date.year
-        month_max = date.month + date_interval
-        month_min = date.month - date_interval
+        month_max = date.month + int(date_interval / 2)
+        month_min = date.month - int(date_interval / 2)
 
         if month_max > 12:
             year_max += (month_max - 1) // 12
@@ -379,13 +381,13 @@ class Cosmicremoval_class:
         date_min = f'{year_min:04d}{month_min:02d}{date.day:02d}T{date.hour:02d}{date.minute:02d}{date.second:02d}'
 
         position = []
-        for loop, file in enumerate(filenames):
-            name_dict = common.SpiceUtils.parse_filename(file)
+        for loop, filename in enumerate(filenames):
+            name_dict = common.SpiceUtils.parse_filename(filename)
             if (name_dict['time'] >= date_min) and (name_dict['time'] <= date_max):
                 position.append(loop)
-                if file == first_filename:
+                if filename == first_filename:
                     first_pos = loop  # global index of the first image with the same ID
-                if file == files[-1]:
+                if filename == files[-1]:
                     last_pos = loop  # global index of the last image with the same ID
         position = np.array(position)  # the positions of the files in the right time interval
         timeinit_images = images[position]  # the images in the time interval
@@ -567,15 +569,14 @@ class Cosmicremoval_class:
         Small function to calculate the appropriate bin count.
         """
 
-        bins = np.arange(int(np.min(data)) - self.bins/2, int(np.max(data)) + self.bins, self.bins)
-        return bins
+        return np.arange(int(np.min(data)) - self.bins/2, int(np.max(data)) + self.bins, self.bins)
 
 
 if __name__ == '__main__':
     mpl.rcParams['figure.figsize'] = (8, 8)
 
     warnings.filterwarnings('ignore', category=mpl.MatplotlibDeprecationWarning)
-    test = Cosmicremoval_class(min_filenb=30)
+    test = Cosmicremoval_class(min_filenb=80)
     test.Multiprocess()
     warnings.filterwarnings("default", category=mpl.MatplotlibDeprecationWarning)
 
