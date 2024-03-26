@@ -16,7 +16,6 @@ from typeguard import typechecked
 from simple_decorators import decorators
 from dateutil.parser import parse as parse_date
 
-
 # Creating a class for the cosmicremoval
 class Cosmicremoval_class:
     """
@@ -31,7 +30,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     @typechecked
-    def __init__(self, processes: int = 16, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 3,
+    def __init__(self, processes: int = 64, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 3,
                 time_intervals: np.ndarray = np.array([4, 40]), bins: int = 5, stats: bool = True, plots: bool = True):
         
         # Arguments
@@ -574,6 +573,10 @@ class Cosmicremoval_class:
 
 if __name__ == '__main__':
     mpl.rcParams['figure.figsize'] = (8, 8)
+
+    import sys
+
+    print(f'version is {sys.version}', flush=True)
 
     warnings.filterwarnings('ignore', category=mpl.MatplotlibDeprecationWarning)
     test = Cosmicremoval_class(min_filenb=80)
