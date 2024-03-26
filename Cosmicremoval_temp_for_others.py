@@ -16,6 +16,7 @@ from typeguard import typechecked
 from simple_decorators import decorators
 from dateutil.parser import parse as parse_date
 
+
 # Creating a class for the cosmicremoval
 class Cosmicremoval_class:
     """
@@ -30,7 +31,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     @typechecked
-    def __init__(self, processes: int = 64, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 3,
+    def __init__(self, processes: int = 90, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 3,
                 time_intervals: np.ndarray = np.array([4, 40]), bins: int = 5, stats: bool = True, plots: bool = True):
         
         # Arguments
@@ -41,7 +42,7 @@ class Cosmicremoval_class:
         self.stats = stats  # Bool to know if stats will be saved
         self.plots = plots  # boolean to know if plots will be saved
         # self.time_intervals = time_intervals
-        self.time_intervals = np.arange(2, 20, 2)
+        self.time_intervals = np.arange(2, 20, 4)
         self.bins = bins
 
         # Code functions
@@ -237,20 +238,20 @@ class Cosmicremoval_class:
             # Saving a csv file for each exposure time
             csv_name = f'Alldata_inter{indexes[0]}_exp{indexes[1]}.csv'
             pandas_dict.to_csv(os.path.join(paths['Exposure'], csv_name), index=False)
-            print(f'Inter{indexes[0]}_exp{indexes[1]} -- CSV files created')
+            print(f'Inter{indexes[0]}_exp{indexes[1]} -- CSV files created', flush=True)
 
             if indexes[0] == last_time:
                 pandas_inter = pd.concat([pandas_inter, pandas_dict], ignore_index=True)
                 if indexes == args[-1]:
                     pandas_name0 = f'Alldata_inter{indexes[0]}.csv'
                     pandas_inter.to_csv(os.path.join(paths['Time interval'], pandas_name0), index=False)
-                    print(f'Inter{indexes[0]} -- CSV files created')
+                    print(f'Inter{indexes[0]} -- CSV files created', flush=True)
             else:
                 if first_try != 0:
                     paths = self.Paths(time_interval=last_time)
                     pandas_name0 = f'Alldata_inter{last_time}.csv'
                     pandas_inter.to_csv(os.path.join(paths['Time interval'], pandas_name0), index=False)
-                    print(f'Inter{indexes[0]} -- CSV files created')
+                    print(f'Inter{indexes[0]} -- CSV files created', flush=True)
                 first_try = 1
                 last_time = indexes[0]
                 pandas_inter = pandas_dict
@@ -305,7 +306,7 @@ class Cosmicremoval_class:
                     self.Error_histo_plotting(paths, nw_masks, data, modes, mads, used_images, before_used, after_used, SPIOBSID, files)
 
             print(f'Inter{time_interval}_exp{exposure}_det{detector}'
-                  f' -- Chunks finished and Median plotting done.')
+                  f' -- Chunks finished and Median plotting done.', flush=True)
 
             # Combining the dictionaries
             data_pandas_exposure = pd.concat([data_pandas_exposure, data_pandas_detector], ignore_index=True)
@@ -419,7 +420,7 @@ class Cosmicremoval_class:
             nw_length = len(nw_timeinit_images)
 
             print(f'Inter{date_interval}_exp{exposure}_det{detector}_ID{SPIOBSID}'
-                  f' -- Nb of used files: {nw_length}')
+                  f' -- Nb of used files: {nw_length}', flush=True)
 
             if nw_length < self.set_min:
                 print(f'\033[31mInter{date_interval}_exp{exposure}_det{detector}_ID{SPIOBSID} '
