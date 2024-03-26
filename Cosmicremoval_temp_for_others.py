@@ -31,7 +31,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     @typechecked
-    def __init__(self, processes: int = 90, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 3,
+    def __init__(self, processes: int = 90, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4,
                 time_intervals: np.ndarray = np.array([4, 40]), bins: int = 5, stats: bool = True, plots: bool = True):
         
         # Arguments
@@ -54,7 +54,7 @@ class Cosmicremoval_class:
         Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
 
-        main_path = os.path.join(os.getcwd(), 'Cosmic_removal_errors')
+        main_path = os.path.join(os.getcwd(), 'Cosmic_removal_errors2')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -580,7 +580,7 @@ if __name__ == '__main__':
     print(f'version is {sys.version}', flush=True)
 
     warnings.filterwarnings('ignore', category=mpl.MatplotlibDeprecationWarning)
-    test = Cosmicremoval_class(min_filenb=80)
+    test = Cosmicremoval_class(min_filenb=20)
     test.Multiprocess()
     warnings.filterwarnings("default", category=mpl.MatplotlibDeprecationWarning)
 
