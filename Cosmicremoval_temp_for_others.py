@@ -32,7 +32,7 @@ class Cosmicremoval_class:
 
     @typechecked
     def __init__(self, processes: int = 90, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4,
-                time_intervals: np.ndarray = np.array([4, 40]), bins: int = 5, stats: bool = True, plots: bool = True):
+                time_intervals: np.ndarray = np.array([2, 4, 6, 8]), bins: int = 5, stats: bool = True, plots: bool = True):
         
         # Arguments
         self.processes = processes
@@ -54,7 +54,7 @@ class Cosmicremoval_class:
         Function to create all the different paths. Lots of if statements to be able to add files where ever I want
         """
 
-        main_path = os.path.join(os.getcwd(), 'Cosmic_removal_errors2')
+        main_path = os.path.join(os.getcwd(), 'Cosmic_removal_errors3')
 
         if time_interval != -1:
             time_path = os.path.join(main_path, f'Date_interval{time_interval}')
@@ -118,7 +118,6 @@ class Cosmicremoval_class:
             pandas_dict = pd.DataFrame(exp_dict)
             sorted_dict = pandas_dict.sort_values(by='Exposure time (s)')
             sorted_dict.to_csv(os.path.join(paths['Main'], csv_name), index=False)
-
         return exposure_used
 
     def Images_all(self, exposure):
