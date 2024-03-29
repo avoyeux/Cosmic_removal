@@ -522,7 +522,7 @@ class Cosmicremoval_class:
 
         # Initialisation
         nw_data = np.copy(data)
-        data_med = np.mean(data, axis=0).astype('float32')
+        data_med = np.median(data, axis=0).astype('float32')
         meds_dif = data - data_med
 
         # Difference between the end result and the initial one
