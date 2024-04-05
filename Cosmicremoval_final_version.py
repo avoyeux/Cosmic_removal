@@ -137,7 +137,6 @@ class Cosmicremoval_class:
         a = 0
         left_nb = 0
         weird_nb = 0
-        all_images = []
         all_files = []
         for files in filenames:
             # Opening the files
@@ -222,15 +221,14 @@ class Cosmicremoval_class:
             
             if len(interval_filenames) < self.set_min:
                 print(f'\033[31mInter{self.time_interval}_exp{exposure}_imgnb{loop} '
-                      f'-- Less than {self.set_min} files for the processing. Going to the next filename\033[0m')
+                      f'-- Less than {self.set_min} files for the processing. Going to the next filename.\033[0m')
                 continue
             
-            new_hdul = []
             treated_pixels = []
             nw_images = []
             for detector in range(2):
                 mad, mode = self.Mad_mean(interval_filenames, detector)
-                image = np.array(fits.getdata(filename, detector)[0, :, :, 0], dtype='float64')
+                image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
                 mask = image > self.coef * mad + mode
 
                 nw_image = np.copy(image)
@@ -244,10 +242,10 @@ class Cosmicremoval_class:
             treated_pixels = np.array(treated_pixels)
 
             print(f'Treatment for image nb {loop} done. Saving to a fits file.')
-            header = fits.getheader(filename, 0)
+            header = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 0)
             nw_header = header.copy()
             nw_header.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
-            init_filename, init_fileextension = os.path.splitext(os.path.basename(filename))
+            init_filename, init_fileextension = os.path.splitext(filename)
 
             hdul_new = []
             hdul_new.append(fits.ImageHDU(data=nw_image[0], header=nw_header))
@@ -257,7 +255,7 @@ class Cosmicremoval_class:
 
             nw_filename = f"{init_filename}_1{init_fileextension}"
             hdul_new.writeto(nw_filename, overwrite=True)
-            print(f'File nb{loop}, i.e. {os.path.basename(filename)}, processed.', flush=True)
+            print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
 
     def Time_interval(self, date_interval, filename, files):
         """
@@ -303,7 +301,7 @@ class Cosmicremoval_class:
         (i.e. spatial chunk with all the temporal values).
         """
 
-        images = np.array([np.array(fits.getdata(filename, detector)[0, :, :, 0], dtype='float64') for filename in filenames]) # TODO: need to check the initial data precision
+        images = np.array([np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64') for filename in filenames]) # TODO: need to check the initial data precision
 
         # Binning the data
         binned_arr = (images // self.bins) * self.bins
