@@ -248,10 +248,11 @@ class Cosmicremoval_class:
             init_filename, init_fileextension = os.path.splitext(filename)
 
             hdul_new = []
-            hdul_new.append(fits.ImageHDU(data=nw_image[0], header=nw_header))
+            hdul_new.append(fits.PrimaryHDU(data=nw_image[0], header=nw_header))
             hdul_new.append(fits.ImageHDU(data=nw_image[1], header=nw_header))
             hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=nw_header))
             hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=nw_header))
+            hdul_new = fits.HDUList(hdul_new)
 
             nw_filename = f"{init_filename}_1{init_fileextension}"
             hdul_new.writeto(nw_filename, overwrite=True)
