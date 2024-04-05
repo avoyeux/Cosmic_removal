@@ -225,7 +225,7 @@ class Cosmicremoval_class:
             if matching:
                 init_version = int(matching.group('version'))
                 new_version = init_version + 1
-                nw_filename = f'{matching.group('group1')}{new_version:02d}{matching.group('group2')}'
+                nw_filename = f"{matching.group('group1')}{new_version:02d}{matching.group('group2')}"
             else:
                 raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
 
