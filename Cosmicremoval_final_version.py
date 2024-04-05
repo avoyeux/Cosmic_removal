@@ -1,14 +1,12 @@
 # IMPORTS
 import os
 import sys
+import re
 import common
 import warnings
-import itertools
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
-import multiprocessing as mp
-import matplotlib.pyplot as plt
 
 from astropy.io import fits
 from collections import Counter
@@ -50,47 +48,6 @@ class Cosmicremoval_class:
         self.exposures = self.Exposure()
 
     ################################################ INITIAL functions #################################################
-    def Paths(self, time_interval=-1, exposure=-1, detector=-1):
-        """
-        Function to create all the different paths. Lots of if statements to be able to add files where ever I want
-        """
-
-        main_path = os.path.join(os.getcwd(), 'Cosmic_removal_errors3')
-
-        if time_interval != -1:
-            time_path = os.path.join(main_path, f'Date_interval{time_interval}')
-
-            if exposure != -1:
-                exposure_path = os.path.join(time_path, f'Exposure{exposure}')
-
-                if detector != -1:
-                    detector_path = os.path.join(exposure_path, f'Detector{detector}')
-                    # Main paths
-                    initial_paths = {'Main': main_path, 'Time interval': time_path, 'Exposure': exposure_path,
-                                     'Detector': detector_path}
-                    # Secondary paths
-                    directories = ['Histograms', 'Statistics', 'Special histograms']
-                    paths = {}
-                    for directory in directories:
-                        path = os.path.join(detector_path, directory)
-                        paths[directory] = path
-                else:
-                    initial_paths = {'Main': main_path, 'Time interval': time_path, 'Exposure': exposure_path}
-                    paths = {}
-            else:
-                initial_paths = {'Main': main_path, 'Time interval': time_path}
-                paths = {}
-        else:
-            initial_paths = {'Main': main_path}
-            paths = {}
-
-        all_paths = {}
-        for d in [initial_paths, paths]:
-            for key, path in d.items():
-                os.makedirs(path, exist_ok=True)
-            all_paths.update(d)
-        return all_paths
-
     def Exposure(self):
         """
         Function to find the different exposure times in the SPICE catalogue.
@@ -112,12 +69,11 @@ class Cosmicremoval_class:
 
         if self.stats:
             # Saving exposure stats
-            paths = self.Paths()
             csv_name = 'Nb_of_darks.csv'
             exp_dict = {'Exposure time (s)': exposure_weighted[:, 0], 'Total number of darks': exposure_weighted[:, 1]}
             pandas_dict = pd.DataFrame(exp_dict)
             sorted_dict = pandas_dict.sort_values(by='Exposure time (s)')
-            sorted_dict.to_csv(os.path.join(paths['Main'], csv_name), index=False)
+            sorted_dict.to_csv(csv_name, index=False)
         return exposure_used
     
     def Images_all(self, exposure):
@@ -233,28 +189,46 @@ class Cosmicremoval_class:
 
                 nw_image = np.copy(image)
                 nw_image[mask] = mode[mask]
-                nw_images.append(nw_image)
+                nw_image = nw_image[np.newaxis, :, :, np.newaxis]
+                nw_images.append(nw_image.astype('int16'))
 
                 old_pixels = np.copy(image)
                 old_pixels[~mask] = 0
-                treated_pixels.append(old_pixels)
+                old_pixels = old_pixels[np.newaxis, :, :, np.newaxis]
+                treated_pixels.append(old_pixels.astype('int16'))
             nw_images = np.array(nw_images)
             treated_pixels = np.array(treated_pixels)
 
             print(f'Treatment for image nb {loop} done. Saving to a fits file.')
-            header = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 0)
-            nw_header = header.copy()
-            nw_header.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
-            init_filename, init_fileextension = os.path.splitext(filename)
+            header1 = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 0)
+            header2 = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 1)
+            nw_header1 = header1.copy()
+            nw_header1.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
+            nw_header2 = header2.copy()
+            nw_header2.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
 
             hdul_new = []
-            hdul_new.append(fits.PrimaryHDU(data=nw_image[0], header=nw_header))
-            hdul_new.append(fits.ImageHDU(data=nw_image[1], header=nw_header))
-            hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=nw_header))
-            hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=nw_header))
+            hdul_new.append(fits.PrimaryHDU(data=nw_images[0], header=nw_header1))
+            hdul_new.append(fits.ImageHDU(data=nw_images[1], header=nw_header2))
+            nw_header1.set('EXTNAME', value='Full SW 4:1 cosmic ray pixels', comment='Extension name')
+            nw_header2.set('EXTNAME', value='Full LW 4:1 cosmic ray pixels', comment='Extension name')
+            hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=nw_header1))
+            hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=nw_header2))
             hdul_new = fits.HDUList(hdul_new)
 
-            nw_filename = f"{init_filename}_1{init_fileextension}"
+            filename_pattern = re.compile(r'''(?P<group1>solo_L1_spice-n-exp_\d{8}T\d{6}_
+                                          V)(?P<version>\d{2})
+                                          (?P<group2>_\d{9}-\d{3}.fits)
+                                          '''. re.VERBOSE)
+
+            matching = filename_pattern.match(filename)
+            if matching:
+                init_version = int(matching.group('version'))
+                new_version = init_version + 1
+                nw_filename = f'{matching.group('group1')}{new_version:02d}{matching.group('group2')}'
+            else:
+                raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
+
             hdul_new.writeto(nw_filename, overwrite=True)
             print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
 
