@@ -180,70 +180,44 @@ class Cosmicremoval_class:
         # Choosing to multiprocess or not
         if self.processes > 1:
             print(f'Number of used processes is {self.processes}', flush=True)
-            args = []
-            for exposure in self.exposures:
-                args.append([self.time_interval, exposure])
             pool = mp.Pool(processes=self.processes)
-            data_pandas_interval = pool.starmap(self.Main, args)
+            pool.starmap(self.Main, self.exposures)
             pool.close()
             pool.join()
 
         else:
-            data_pandas_all = pd.DataFrame()
-
-            for time_inter in self.time_intervals:
-                data_pandas_interval = pd.DataFrame()
-
-                for exposure in self.exposures:
-                    data_pandas_exposure = self.Main(time_inter, exposure)
-
-                    if not self.stats:
-                        continue
-                    paths = self.Paths(time_interval=time_inter, exposure=exposure)
-                    data_pandas_interval = pd.concat([data_pandas_interval, data_pandas_exposure], ignore_index=True)
-                    pandas_name0 = f'Alldata_inter{time_inter}_exp{exposure}.csv'
-                    data_pandas_exposure.to_csv(os.path.join(paths['Exposure'], pandas_name0), index=False)
-
-                if not self.stats:
-                    continue
-                data_pandas_all = pd.concat([data_pandas_all, data_pandas_interval], ignore_index=True)
-                pandas_name1 = f'Alldata_inter{time_inter}.csv'
-                data_pandas_interval.to_csv(os.path.join(paths['Time interval'], pandas_name1), index=False)
-
-            if self.stats:
-                pandas_name = 'Alldata.csv'
-                data_pandas_all.to_csv(os.path.join(paths['Main'], pandas_name), index=False)
+            for exposure in self.exposures:
+                self.Main(exposure)
     
     @decorators.running_time
-    def Main(self, time_interval, exposure):
+    def Main(self, exposure):
         print(f'The process id is {os.getpid()}')
-        time_interval = int(time_interval)
         # MAIN LOOP
         # Initialisation of the stats for csv file saving
         filenames = self.Images_all(exposure)
 
         if len(filenames) < self.min_filenb:
-            print(f'\033[91mInter{time_interval}_exp{exposure} -- Less than {self.min_filenb} usable files. '
+            print(f'\033[91mInter{self.time_interval}_exp{exposure} -- Less than {self.min_filenb} usable files. '
                   f'Changing exposure times.\033[0m')
             return
 
         # MULTIPLE DARKS analysis
         same_darks = self.Samedarks(filenames)
 
-        print(f'Inter{time_interval}_exp{exposure} -- Starting chunks.')
+        print(f'Inter{self.time_interval}_exp{exposure} -- Starting chunks.')
         for loop, filename in enumerate(filenames):
             if filename in [item for sublist in same_darks.values() for item in sublist if len(sublist) > 3]:
-                print(f'\033[31mInter{time_interval}_exp{exposure}_imgnb{loop}'
+                print(f'\033[31mInter{self.time_interval}_exp{exposure}_imgnb{loop}'
                       f'-- Image from a SPIOBSID set of 3 or more darks. Going to the next acquisition.\033[0m')
                 continue
 
-            interval_filenames = self.Time_interval(time_interval, filename, filenames)
+            interval_filenames = self.Time_interval(self.time_interval, filename, filenames)
             
-            print(f'Inter{time_interval}_exp{exposure}_imgnb{loop}'
+            print(f'Inter{self.time_interval}_exp{exposure}_imgnb{loop}'
                   f' -- Nb of used files: {len(interval_filenames)}')
             
             if len(interval_filenames) < self.set_min:
-                print(f'\033[31mInter{time_interval}_exp{exposure}_imgnb{loop} '
+                print(f'\033[31mInter{self.time_interval}_exp{exposure}_imgnb{loop} '
                       f'-- Less than {self.set_min} files for the processing. Going to the next filename\033[0m')
                 continue
             
@@ -279,6 +253,7 @@ class Cosmicremoval_class:
 
             nw_filename = f"{init_filename}_1{init_fileextension}"
             hdul_new.writeto(nw_filename, overwrite=True)
+            print(f'File nb{loop}, i.e. {os.path.basename(filename)}, processed.', flush=True)
 
     def Time_interval(self, date_interval, filename, files):
         """
