@@ -170,6 +170,7 @@ class Cosmicremoval_class:
         if len(all_files) == 0:
             print(f'\033[91m ERROR: NO "USABLE" ACQUISITIONS - STOPPING THE RUN\033[0m')
             sys.exit()
+        return all_files
 
     ############################################### CALCULATION functions ##############################################
     @decorators.running_time
@@ -287,7 +288,7 @@ class Cosmicremoval_class:
             if interval_filename == filename:
                 continue
             name_dict = common.SpiceUtils.parse_filename(interval_filename)
-            date = parse_date(name_dict['time'])
+            date = name_dict['time']
 
             if (date >= date_min) and (date <= date_max):
                 interval_filenames.append(interval_filename)
