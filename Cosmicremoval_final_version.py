@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from collections import Counter
 from typeguard import typechecked
+from multiprocessing import Process
 from simple_decorators import decorators
 from dateutil.parser import parse as parse_date
 
@@ -180,11 +181,13 @@ class Cosmicremoval_class:
         # Choosing to multiprocess or not
         if self.processes > 1:
             print(f'Number of used processes is {self.processes}', flush=True)
-            pool = mp.Pool(processes=self.processes)
-            pool.starmap(self.Main, self.exposures)
-            pool.close()
-            pool.join()
-
+            processes = []
+            for exposure in self.exposures:
+                processes.append(Process(target=self.Main, args=(exposure,)))
+            for p in processes:
+                p.start()
+            for p in processes:
+                p.join()
         else:
             for exposure in self.exposures:
                 self.Main(exposure)
