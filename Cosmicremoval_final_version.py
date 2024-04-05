@@ -88,7 +88,6 @@ class Cosmicremoval_class:
             for key, path in d.items():
                 os.makedirs(path, exist_ok=True)
             all_paths.update(d)
-
         return all_paths
 
     def Exposure(self):
@@ -181,15 +180,13 @@ class Cosmicremoval_class:
         # Choosing to multiprocess or not
         if self.processes > 1:
             print(f'Number of used processes is {self.processes}', flush=True)
-            args = list(itertools.product(self.time_interval, self.exposures))
+            args = []
+            for exposure in self.exposures:
+                args.append([self.time_interval, exposure])
             pool = mp.Pool(processes=self.processes)
             data_pandas_interval = pool.starmap(self.Main, args)
             pool.close()
             pool.join()
-
-            if self.stats:
-                # Saving the data in csv files
-                self.Saving_csv(data_pandas_interval)
 
         else:
             data_pandas_all = pd.DataFrame()
@@ -282,7 +279,6 @@ class Cosmicremoval_class:
 
             nw_filename = f"{init_filename}_1{init_fileextension}"
             hdul_new.writeto(nw_filename, overwrite=True)
-
 
     def Time_interval(self, date_interval, filename, files):
         """
