@@ -250,8 +250,8 @@ class Cosmicremoval_class:
             hdul_new = []
             hdul_new.append(fits.ImageHDU(data=nw_image[0], header=nw_header))
             hdul_new.append(fits.ImageHDU(data=nw_image[1], header=nw_header))
-            hdul_new.append(fits.ImageHdu(data=treated_pixels[0], header=nw_header))
-            hdul_new.append(fits.ImageHdu(data=treated_pixels[1], header=nw_header))
+            hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=nw_header))
+            hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=nw_header))
 
             nw_filename = f"{init_filename}_1{init_fileextension}"
             hdul_new.writeto(nw_filename, overwrite=True)
@@ -293,7 +293,7 @@ class Cosmicremoval_class:
         return interval_filenames
 
     def mode_along_axis(self, arr):
-        return np.bincount(arr).argmax()
+        return np.bincount(arr.astype('int64')).argmax()
     
     def Mad_mean(self, filenames, detector):
         """
