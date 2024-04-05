@@ -218,8 +218,8 @@ class Cosmicremoval_class:
 
             filename_pattern = re.compile(r'''(?P<group1>solo_L1_spice-n-exp_\d{8}T\d{6}_
                                           V)(?P<version>\d{2})
-                                          (?P<group2>_\d{9}-\d{3}.fits)
-                                          '''. re.VERBOSE)
+                                          (?P<group2>_\d+-\d+.fits)
+                                          ''', re.VERBOSE)
 
             matching = filename_pattern.match(filename)
             if matching:
