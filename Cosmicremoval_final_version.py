@@ -31,14 +31,13 @@ class Cosmicremoval_class:
 
     @typechecked
     def __init__(self, processes: int = 15, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4,
-                time_interval: int = 6, bins: int = 5, stats: bool = True, plots: bool = True):
+                time_interval: int = 6, bins: int = 5, plots: bool = True):
         
         # Arguments
         self.processes = processes
         self.coef = coefficient
         self.min_filenb = min_filenb
         self.set_min = set_min
-        self.stats = stats  # Bool to know if stats will be saved
         self.plots = plots  # boolean to know if plots will be saved
         # self.time_intervals = time_intervals
         self.time_interval = time_interval
@@ -61,19 +60,18 @@ class Cosmicremoval_class:
         [print(f'For exposure time {exposure[0]}s there are {int(exposure[1])} darks.') for exposure in exposure_weighted]
 
         # Keeping the exposure times with enough darks
-        occurrences_filter = exposure_weighted[:, 1] > self.min_filenb
+        occurrences_filter = (exposure_weighted[:, 1] > self.min_filenb)
         exposure_used = exposure_weighted[occurrences_filter][:, 0]
         print(f'\033[93mExposure times with less than \033[1m{self.min_filenb}\033[0m\033[93m darks are not kept.'
               f'\033[0m')
         print(f'\033[33mExposure times kept are {exposure_used}\033[0m')
 
-        if self.stats:
-            # Saving exposure stats
-            csv_name = 'Nb_of_darks.csv'
-            exp_dict = {'Exposure time (s)': exposure_weighted[:, 0], 'Total number of darks': exposure_weighted[:, 1]}
-            pandas_dict = pd.DataFrame(exp_dict)
-            sorted_dict = pandas_dict.sort_values(by='Exposure time (s)')
-            sorted_dict.to_csv(csv_name, index=False)
+        # Saving exposure stats
+        csv_name = 'Nb_of_darks.csv'
+        exp_dict = {'Exposure time (s)': exposure_weighted[:, 0], 'Total number of darks': exposure_weighted[:, 1]}
+        pandas_dict = pd.DataFrame(exp_dict)
+        sorted_dict = pandas_dict.sort_values(by='Exposure time (s)')
+        sorted_dict.to_csv(csv_name, index=False)
         return exposure_used
     
     def Images_all(self, exposure):
@@ -167,10 +165,10 @@ class Cosmicremoval_class:
         for loop, filename in enumerate(filenames):
             if filename in [item for sublist in same_darks.values() for item in sublist if len(sublist) > 3]:
                 print(f'\033[31mInter{self.time_interval}_exp{exposure}_imgnb{loop}'
-                      f'-- Image from a SPIOBSID set of 3 or more darks. Going to the next acquisition.\033[0m')
+                      f'-- Image from a SPIOBSID set of 4 or more darks. Going to the next acquisition.\033[0m')
                 continue
 
-            interval_filenames = self.Time_interval(self.time_interval, filename, filenames)
+            interval_filenames = self.Time_interval(filename, filenames)
             
             print(f'Inter{self.time_interval}_exp{exposure}_imgnb{loop}'
                   f' -- Nb of used files: {len(interval_filenames)}')
@@ -179,47 +177,12 @@ class Cosmicremoval_class:
                 print(f'\033[31mInter{self.time_interval}_exp{exposure}_imgnb{loop} '
                       f'-- Less than {self.set_min} files for the processing. Going to the next filename.\033[0m')
                 continue
-            
-            treated_pixels = []
-            nw_images = []
-            for detector in range(2):
-                mad, mode = self.Mad_mean(interval_filenames, detector)
-                image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
-                mask = image > self.coef * mad + mode
 
-                nw_image = np.copy(image)
-                nw_image[mask] = mode[mask]
-                nw_image = nw_image[np.newaxis, :, :, np.newaxis]
-                nw_images.append(nw_image.astype('int16'))
-
-                old_pixels = np.copy(image)
-                old_pixels[~mask] = 0
-                old_pixels = old_pixels[np.newaxis, :, :, np.newaxis]
-                treated_pixels.append(old_pixels.astype('int16'))
-            nw_images = np.array(nw_images)
-            treated_pixels = np.array(treated_pixels)
-
-            print(f'Treatment for image nb {loop} done. Saving to a fits file.')
-            header1 = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 0)
-            header2 = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 1)
-            nw_header1 = header1.copy()
-            nw_header1.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
-            nw_header2 = header2.copy()
-            nw_header2.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
-
-            hdul_new = []
-            hdul_new.append(fits.PrimaryHDU(data=nw_images[0], header=nw_header1))
-            hdul_new.append(fits.ImageHDU(data=nw_images[1], header=nw_header2))
-            nw_header1.set('EXTNAME', value='Full SW 4:1 cosmic ray pixels', comment='Extension name')
-            nw_header2.set('EXTNAME', value='Full LW 4:1 cosmic ray pixels', comment='Extension name')
-            hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=nw_header1))
-            hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=nw_header2))
-            hdul_new = fits.HDUList(hdul_new)
-
+            # Setting the filename for the new fits file:
             filename_pattern = re.compile(r'''(?P<group1>solo_L1_spice-n-exp_\d{8}T\d{6}_
-                                          V)(?P<version>\d{2})
-                                          (?P<group2>_\d+-\d+.fits)
-                                          ''', re.VERBOSE)
+                                V)(?P<version>\d{2})
+                                (?P<group2>_\d+-\d+.fits)
+                                ''', re.VERBOSE)
 
             matching = filename_pattern.match(filename)
             if matching:
@@ -228,11 +191,54 @@ class Cosmicremoval_class:
                 nw_filename = f"{matching.group('group1')}{new_version:02d}{matching.group('group2')}"
             else:
                 raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
+            
+            treated_pixels = []
+            nw_images = []
+            for detector in range(2):
+                mode, mad = self.Mad_mean(interval_filenames, detector)
+                image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
+                mask = image > self.coef * mad + mode
 
+                nw_image = np.copy(image)
+                nw_image[mask] = mode[mask]
+                nw_image = nw_image[np.newaxis, :, :, np.newaxis]
+                nw_images.append(nw_image.astype('uint16'))
+
+                old_pixels = np.copy(image)
+                old_pixels[~mask] = 0
+                old_pixels = old_pixels[np.newaxis, :, :, np.newaxis]
+                treated_pixels.append(old_pixels.astype('uint16'))
+            nw_images = np.array(nw_images)
+            treated_pixels = np.array(treated_pixels)
+
+            print(f'Treatment for image nb {loop} done. Saving to a fits file.')
+            header1 = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 0)
+            header2 = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 1)
+
+            # Creating the new hdu headers for the Cosmics treatment images
+            nw_header1 = header1.copy()
+            nw_header2 = header2.copy()
+
+            nw_header1.set('FILENAME', value=nw_filename, comment='Filename')
+            nw_header2.set('FILENAME', value=nw_filename, comment='Filename')
+            nw_header1.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
+            nw_header2.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
+
+            hdul_new = []
+            hdul_new.append(fits.PrimaryHDU(data=nw_images[0], header=nw_header1))
+            hdul_new.append(fits.ImageHDU(data=nw_images[1], header=nw_header2))
+            
+            nw_header1.set('EXTNAME', value='Full SW (No compression) cosmic ray pixels', comment='Extension name')
+            nw_header2.set('EXTNAME', value='Full LW (No compression) cosmic ray pixels', comment='Extension name')
+
+            hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=nw_header1))
+            hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=nw_header2))
+
+            hdul_new = fits.HDUList(hdul_new)
             hdul_new.writeto(nw_filename, overwrite=True)
             print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
 
-    def Time_interval(self, date_interval, filename, files):
+    def Time_interval(self, filename, files):
         """
         Finding the images in the time interval specified for a given filename. Hence, we are getting the sequences of images needed for each individual
         dark treatment.
@@ -243,8 +249,8 @@ class Cosmicremoval_class:
 
         year_max = date.year
         year_min = date.year
-        month_max = date.month + int(date_interval / 2)
-        month_min = date.month - int(date_interval / 2)
+        month_max = date.month + int(self.time_interval / 2)
+        month_min = date.month - int(self.time_interval / 2)
 
         if month_max > 12:
             year_max += (month_max - 1) // 12
@@ -283,7 +289,7 @@ class Cosmicremoval_class:
 
         modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr).astype('float64')  #a double list comprehension with reshape could be faster
         mads = np.mean(np.abs(images - modes), axis=0).astype('float64')
-        return mads, modes # these are all the values for each chunk
+        return modes, mads 
 
     def Samedarks(self, filenames):
         # Dictionaries initialisation
