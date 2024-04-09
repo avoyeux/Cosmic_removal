@@ -262,7 +262,7 @@ class Cosmicremoval_class:
 
         # The dictionary with all the header statistics
         headers_dict = {
-            'FILENAME': [new_filename, 'Filename'],
+            'FILENAME': [new_filename, 'Filenam'],
             'OBS_DESC': ['testing if it works', 'testing the comments'],
             'DATAMIN': [np.nanmin(image),     '[adu] Minimum data value'],
             'DATAMAX': [np.nanmax(image),     '[adu] Maximum data value'],
@@ -286,10 +286,28 @@ class Cosmicremoval_class:
         if cosmic:
             headers_dict['EXTNAME'] = [cosmic_extname, 'Extension name']
 
-        headers_string = self.Header_string(headers_dict)
-        for string in headers_string:
-            header.append(fits.Card.fromstring(string))
+        headers_string_n_key = self.Header_string(headers_dict)
+        headers_before = self.Header_order(headers_dict.keys())
+        for (key, string) in headers_string_n_key:
+            header.insert(headers_before[key], fits.Card.fromstring(string))
         return header
+    
+    def Header_order(self, keys: list):
+        """
+        To place the updated headers in the right place. .set() is not used here as I have to use .Card
+        objects to comply to the initial formatting.
+        """
+
+        headers_before = {
+            'EXTNAME': 'DATE',
+            'FILENAME': 'EXTNAME',
+            'OBS_DESC': 'SPIOBSID',
+            'DATAMIN': 'PCT_APRX',
+        }
+        
+        for loop in  range(3, keys):
+            headers_before[keys[loop]] = keys[loop - 1]
+        return headers_before
 
     def Header_string(self, header_dict: dict) -> list:
         """
@@ -297,14 +315,14 @@ class Cosmicremoval_class:
         have the same formatting.
         """
 
-        header_strings = []
+        header_strings_n_key = []
         for key, (value, comment) in header_dict.items():
             value_length = 7 if key not in ['DATARMS', 'DATANRMS', 'DATAMAD', 'DATASKEW', 'DATAKURT'] else 13
             value_string = self.Header_value_length(value, value_length) if not isinstance(value, str) else f" '{value}'"
-            header_strings.append( 
-                f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}'
+            header_strings_n_key.append( 
+                (key, f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}')
             )
-        return header_strings    
+        return header_strings_n_key    
         
     def Header_value_length(self, value: int | float, length: int) -> str:
         """
