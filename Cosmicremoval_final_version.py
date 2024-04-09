@@ -289,7 +289,8 @@ class Cosmicremoval_class:
         headers_string_n_key = self.Header_string(headers_dict)
         headers_before = self.Header_order(list(headers_dict.keys()))
         for (key, string) in headers_string_n_key:
-            header.insert(headers_before[key], fits.Card.fromstring(string))
+            header.remove(key)
+            header.insert(headers_before[key], fits.Card.fromstring(string), after=True)
         return header
     
     def Header_order(self, keys: list):
