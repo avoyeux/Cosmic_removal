@@ -30,7 +30,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     @typechecked
-    def __init__(self, processes: int = 15, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4,
+    def __init__(self, processes: int = 1, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4,
                 time_interval: int = 6, bins: int = 5, plots: bool = True):
         
         # Arguments
@@ -300,7 +300,7 @@ class Cosmicremoval_class:
         header_strings = []
         for key, (value, comment) in header_dict.items():
             value_length = 7 if key not in ['DATARMS', 'DATANRMS', 'DATAMAD', 'DATASKEW', 'DATAKURT'] else 13
-            value_string = self.Header_value_length(value, value_length) if not isinstance(value, str) else f"'{value}'"
+            value_string = self.Header_value_length(value, value_length) if not isinstance(value, str) else f" '{value}'"
             header_strings.append( 
                 f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}'
             )
