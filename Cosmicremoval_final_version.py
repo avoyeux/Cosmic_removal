@@ -287,7 +287,7 @@ class Cosmicremoval_class:
             headers_dict['EXTNAME'] = [cosmic_extname, 'Extension name']
 
         headers_string_n_key = self.Header_string(headers_dict)
-        headers_before = self.Header_order(headers_dict.keys())
+        headers_before = self.Header_order(list(headers_dict.keys()))
         for (key, string) in headers_string_n_key:
             header.insert(headers_before[key], fits.Card.fromstring(string))
         return header
@@ -305,7 +305,7 @@ class Cosmicremoval_class:
             'DATAMIN': 'PCT_APRX',
         }
         
-        for loop in  range(3, keys):
+        for loop in  range(3, len(keys)):
             headers_before[keys[loop]] = keys[loop - 1]
         return headers_before
 
