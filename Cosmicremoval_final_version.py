@@ -46,6 +46,10 @@ class Cosmicremoval_class:
         # Code functions
         self.exposures = self.Exposure()
 
+        # Constants
+        self.header_key_length = 8  # the length of the key in the headers
+        self.header_value_length = 21  # the length of the value in the headers
+
     ################################################ INITIAL functions #################################################
     def Exposure(self):
         """
@@ -188,12 +192,12 @@ class Cosmicremoval_class:
             if matching:
                 init_version = int(matching.group('version'))
                 new_version = init_version + 1
-                nw_filename = f"{matching.group('group1')}{new_version:02d}{matching.group('group2')}"
+                new_filename = f"{matching.group('group1')}{new_version:02d}{matching.group('group2')}"
             else:
                 raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
             
             treated_pixels = []
-            nw_images = []
+            new_images = []
             for detector in range(2):
                 mode, mad = self.Mad_mean(interval_filenames, detector)
                 image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
@@ -202,41 +206,131 @@ class Cosmicremoval_class:
                 nw_image = np.copy(image)
                 nw_image[mask] = mode[mask]
                 nw_image = nw_image[np.newaxis, :, :, np.newaxis]
-                nw_images.append(nw_image.astype('uint16'))
+                new_images.append(nw_image.astype('uint16'))
 
                 old_pixels = np.copy(image)
                 old_pixels[~mask] = 0
                 old_pixels = old_pixels[np.newaxis, :, :, np.newaxis]
                 treated_pixels.append(old_pixels.astype('uint16'))
-            nw_images = np.array(nw_images)
+            new_images = np.array(new_images)
             treated_pixels = np.array(treated_pixels)
-
             print(f'Treatment for image nb {loop} done. Saving to a fits file.')
-            header1 = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 0)
-            header2 = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 1)
 
-            # Creating the new hdu headers for the Cosmics treatment images
-            nw_header1 = header1.copy()
-            nw_header2 = header2.copy()
+            # Creating the new_headers
+            headers = self.Changing_the_hdu_headers(filename, new_filename, new_images, treated_pixels)
 
-            nw_header1.set('FILENAME', value=nw_filename, comment='Filename')
-            nw_header2.set('FILENAME', value=nw_filename, comment='Filename')
-            nw_header1.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
-            nw_header2.set('OBS_DESC', value='testing if it works', comment='testing if the comments work')
-
+            # Creating the total hdul
             hdul_new = []
-            hdul_new.append(fits.PrimaryHDU(data=nw_images[0], header=nw_header1))
-            hdul_new.append(fits.ImageHDU(data=nw_images[1], header=nw_header2))
-            
-            nw_header1.set('EXTNAME', value='Full SW (No compression) cosmic ray pixels', comment='Extension name')
-            nw_header2.set('EXTNAME', value='Full LW (No compression) cosmic ray pixels', comment='Extension name')
-
-            hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=nw_header1))
-            hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=nw_header2))
-
+            hdul_new.append(fits.PrimaryHDU(data=new_images[0], header=headers[0][0]))
+            hdul_new.append(fits.ImageHDU(data=new_images[1], header=headers[0][1]))
+            hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=headers[1][0]))
+            hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=headers[1][1]))
             hdul_new = fits.HDUList(hdul_new)
-            hdul_new.writeto(nw_filename, overwrite=True)
+            hdul_new.writeto(new_filename, overwrite=True)
             print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
+
+    def Changing_the_hdu_headers(self, old_filename, new_filename, new_images, new_masks):
+        """
+        Where I put all the changes to the hdu headers for a better organised code.
+        """
+
+        # Getting the initial headers
+        init_header_SW = fits.getheader(common.SpiceUtils.ias_fullpath(old_filename), 0)
+        init_header_LW = fits.getheader(common.SpiceUtils.ias_fullpath(old_filename), 1)
+
+        # Creating the new headers
+        header_SW_0, header_LW_0 = init_header_SW.copy(), init_header_LW.copy()
+        header_SW_0 = self.Header(new_filename, header_SW_0, new_images[0])
+        header_LW_0 = self.Header(new_filename, header_LW_0, new_images[1])
+
+        header_SW_1, header_LW_1 = header_SW_0.copy(), header_LW_0.copy()
+        header_SW_1 = self.Header(new_filename, header_SW_1, new_masks[0], cosmic=True, cosmic_extname=header_SW_0['EXTNAME'])
+        header_LW_1 = self.Header(new_filename, header_LW_1, new_masks[0], cosmic=True, cosmic_extname=header_LW_0['EXTNAME'])
+        return [[header_SW_0, header_LW_0], [header_SW_1, header_LW_1]]
+    
+    def Header(self, new_filename, header, image, cosmic: bool = False, cosmic_extname: str = ''):
+        """
+        To get the values needed for the headers.
+        """
+
+        # Values that are used multiple times or need a long formula
+        N = np.count_nonzero(~np.isnan(image))
+        image_mean = np.nanmean(image)
+        image_rms = np.sqrt(np.nanmean((image - image_mean)**2))
+        skewness = np.nansum((image - np.nanmean(image))**3) / ((N - 1) * np.nanstd(image)**3)
+        kurtosis = N * np.nansum((image - np.nanmean(image))**4) / np.nansum((image - np.nanmean(image)**2)**2)
+
+        # The dictionary with all the header statistics
+        headers_dict = {
+            'FILENAME': [new_filename, 'Filename'],
+            'OBS_DESC': ['testing if it works', 'testing the comments'],
+            'DATAMIN': [np.nanmin(image),     '[adu] Minimum data value'],
+            'DATAMAX': [np.nanmax(image),     '[adu] Maximum data value'],
+            'DATAMEAN': [image_mean,          '[adu] Mean    data value'],
+            'DATAMEDN': [np.nanmedian(image), '[adu] Median  data value'],
+            'DATAP01': [np.nanpercentile(image, 1),  '[adu] 1st  percentile of data values'],
+            'DATAP10': [np.nanpercentile(image, 10), '[adu] 10th percentile of data values'],
+            'DATAP25': [np.nanpercentile(image, 25), '[adu] 25th percentile of data values'],
+            'DATAP75': [np.nanpercentile(image, 75), '[adu] 75th percentile of data values'],
+            'DATAP90': [np.nanpercentile(image, 90), '[adu] 90th percentile of data values'],
+            'DATAP95': [np.nanpercentile(image, 95), '[adu] 95th percentile of data values'],
+            'DATAP98': [np.nanpercentile(image, 98), '[adu] 98th percentile of data values'],
+            'DATAP99': [np.nanpercentile(image, 99), '[adu] 99th percentile of data values'],
+            'DATARMS': [image_rms, '[adu] RMS dev: sqrt(sum((data-DATAMEAN)^2)/N)'],
+            'DATANRMS': [image_rms / image_mean, 'Normalised RMS dev: DATARMS/DATAMEAN'],
+            'DATAMAD': [np.nanmean(np.abs(image - image_mean)), '[adu] Mean abs dev: sum(abs(data-DATAMEAN))/N '],
+            'DATASKEW': [skewness, 'Data skewness'],
+            'DATAKURT': [kurtosis, 'Data kurtosis'],
+        }
+
+        if cosmic:
+            headers_dict['EXTNAME'] = [cosmic_extname, 'Extension name']
+
+        headers_string = self.Header_string(headers_dict)
+        for string in headers_string:
+            header.append(fits.Card.fromstring(string))
+        return header
+
+    def Header_string(self, header_dict: dict) -> list:
+        """
+        Given that in the initial hdul headers have all the same lengths till the header, I need a custom function to
+        have the same formatting.
+        """
+
+        header_strings = []
+        for key, (value, comment) in header_dict.items():
+            value_length = 7 if key not in ['DATARMS', 'DATANRMS', 'DATAMAD', 'DATASKEW', 'DATAKURT'] else 13
+            value_string = self.Header_value_length(value, value_length) if not isinstance(value, str) else value
+            header_strings.append( 
+                f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}'
+            )
+        return header_strings    
+        
+    def Header_value_length(self, value: int | float, length: int) -> str:
+        """
+        Changing the value to a string of a given size (i.e. adding decimals or taking some away).
+        """
+
+        a = 0
+        if value < 0:
+            a += 1 if len(str(int(value))) != 1 else 0
+        int_length = len(str(int(value)))
+        number = a + length - (int_length + 1)
+        return format(value, f'.{number}f') if number > 0 else str(int(value)) + '.' if number == 0 else str(int(value))  
+    
+    def Format_string_right(self, string: str, length: int) -> str:
+        """
+        Creating a string with a set length and starting from the right.
+        """
+
+        return string.rjust(length)
+    
+    def Format_string_left(self, string: str, length: int) -> str:
+        """
+        Creating a string with a set length and starting from the left.
+        """
+
+        return string.ljust(length)
 
     def Time_interval(self, filename, files):
         """
