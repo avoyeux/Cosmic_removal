@@ -329,7 +329,7 @@ class Cosmicremoval_class:
         for key, (value, comment) in header_dict.items():
             value_length = 7 if key not in ['DATARMS', 'DATANRMS', 'DATAMAD', 'DATASKEW', 'DATAKURT'] else 13
             if not isinstance(value, str):
-                value_string = self.Header_value(value, value_length)
+                value_string = self.Header_value_length(value, value_length)
                 header_strings_n_key.append(
                     (key, f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}'[:80])
                 )
