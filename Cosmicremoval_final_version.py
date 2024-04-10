@@ -202,7 +202,7 @@ class Cosmicremoval_class:
                 mode, mad = self.Mad_mean(interval_filenames, detector)
                 image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
                 mask = image > self.coef * mad + mode
-
+                
                 nw_image = np.copy(image)
                 nw_image[mask] = mode[mask]
                 nw_image = nw_image[np.newaxis, :, :, np.newaxis]
@@ -217,7 +217,7 @@ class Cosmicremoval_class:
             print(f'Treatment for image nb {loop} done. Saving to a fits file.')
 
             # Creating the new_headers
-            headers = self.Changing_the_hdu_headers(filename, new_filename, new_images, treated_pixels)
+            headers = self.Changing_the_hdu_headers(filename, new_filename, new_images, treated_pixels, new_version)
 
             # Creating the total hdul
             hdul_new = []
@@ -229,7 +229,7 @@ class Cosmicremoval_class:
             hdul_new.writeto(new_filename, overwrite=True)
             print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
 
-    def Changing_the_hdu_headers(self, old_filename, new_filename, new_images, new_masks):
+    def Changing_the_hdu_headers(self, old_filename, new_filename, new_images, new_masks, version):
         """
         Where I put all the changes to the hdu headers for a better organised code.
         """
@@ -240,15 +240,15 @@ class Cosmicremoval_class:
 
         # Creating the new headers
         header_SW_0, header_LW_0 = init_header_SW.copy(), init_header_LW.copy()
-        header_SW_0 = self.Header(new_filename, header_SW_0, new_images[0])
-        header_LW_0 = self.Header(new_filename, header_LW_0, new_images[1])
+        header_SW_0 = self.Header(version, new_filename, header_SW_0, new_images[0])
+        header_LW_0 = self.Header(version, new_filename, header_LW_0, new_images[1])
 
         header_SW_1, header_LW_1 = header_SW_0.copy(), header_LW_0.copy()
-        header_SW_1 = self.Header(new_filename, header_SW_1, new_masks[0], cosmic=True, cosmic_extname=header_SW_0['EXTNAME'])
-        header_LW_1 = self.Header(new_filename, header_LW_1, new_masks[0], cosmic=True, cosmic_extname=header_LW_0['EXTNAME'])
+        header_SW_1 = self.Header(version, new_filename, header_SW_1, new_masks[0], cosmic=True, cosmic_extname=header_SW_0['EXTNAME'])
+        header_LW_1 = self.Header(version, new_filename, header_LW_1, new_masks[0], cosmic=True, cosmic_extname=header_LW_0['EXTNAME'])
         return [[header_SW_0, header_LW_0], [header_SW_1, header_LW_1]]
     
-    def Header(self, new_filename, header, image, cosmic: bool = False, cosmic_extname: str = ''):
+    def Header(self, version, new_filename, header, image, cosmic: bool = False, cosmic_extname: str = ''):
         """
         To get the values needed for the headers.
         """
@@ -262,8 +262,11 @@ class Cosmicremoval_class:
 
         # The dictionary with all the header statistics
         headers_dict = {
+            'EXTNAME': [cosmic_extname, 'Extension name'],
             'FILENAME': [new_filename, 'Filenam'],
-            'OBS_DESC': ['testing if it works', 'testing the comments'],
+            'NWIN': [4, 'Total number of windows in this file'],
+            'NWIN_PRF': [4, 'Number of windows not Dumbbell or Intensity'],
+            'VERSION': [f'{version:02d}      ', 'Incremental file version number'],
             'DATAMIN': [np.nanmin(image),     '[adu] Minimum data value'],
             'DATAMAX': [np.nanmax(image),     '[adu] Maximum data value'],
             'DATAMEAN': [image_mean,          '[adu] Mean    data value'],
@@ -291,6 +294,10 @@ class Cosmicremoval_class:
         for (key, string) in headers_string_n_key:
             header.remove(key)
             header.insert(headers_before[key], fits.Card.fromstring(string), after=True)
+
+            # Adding a white space in the headers to get the initial formatting
+            if key in ['EXTNAME', 'NWIN', 'DATAMIN']:
+                header.insert(headers_before[key], fits.Card.fromstring(''), after=True)
         return header
     
     def Header_order(self, keys: list):
@@ -302,11 +309,13 @@ class Cosmicremoval_class:
         headers_before = {
             'EXTNAME': 'DATE',
             'FILENAME': 'EXTNAME',
-            'OBS_DESC': 'SPIOBSID',
+            'NWIN': 'SVO_GRP',
+            'NWIN_PRF': 'NWIN',
+            'VERSION': 'VERS_SW',
             'DATAMIN': 'PCT_APRX',
-        }
-        
-        for loop in  range(3, len(keys)):
+        }      
+
+        for loop in  range(6, len(keys)):
             headers_before[keys[loop]] = keys[loop - 1]
         return headers_before
 
