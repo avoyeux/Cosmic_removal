@@ -328,10 +328,16 @@ class Cosmicremoval_class:
         header_strings_n_key = []
         for key, (value, comment) in header_dict.items():
             value_length = 7 if key not in ['DATARMS', 'DATANRMS', 'DATAMAD', 'DATASKEW', 'DATAKURT'] else 13
-            value_string = self.Header_value_length(value, value_length) if not isinstance(value, str) else f" '{value}'"
-            header_strings_n_key.append( 
-                (key, f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}'[:80])
-            )
+            if not isinstance(value, str):
+                value_string = self.Header_value(value, value_length)
+                header_strings_n_key.append(
+                    (key, f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}'[:80])
+                )
+            else:
+                value_string = f" '{value}'"
+                header_strings_n_key.append(
+                    (key, f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_left(value_string, self.header_value_length)} / {comment}'[:80])
+                )
         return header_strings_n_key    
         
     def Header_value_length(self, value: int | float, length: int) -> str:
