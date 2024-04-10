@@ -240,15 +240,15 @@ class Cosmicremoval_class:
 
         # Creating the new headers
         header_SW_0, header_LW_0 = init_header_SW.copy(), init_header_LW.copy()
-        header_SW_0 = self.Header(version, new_filename, header_SW_0, new_images[0])
-        header_LW_0 = self.Header(version, new_filename, header_LW_0, new_images[1])
+        header_SW_0 = self.Header(version, new_filename, header_SW_0, new_images[0], cosmic_extname=header_SW_0['EXTNAME'])
+        header_LW_0 = self.Header(version, new_filename, header_LW_0, new_images[1], cosmic_extname=header_LW_0['EXTNAME'])
 
         header_SW_1, header_LW_1 = header_SW_0.copy(), header_LW_0.copy()
-        header_SW_1 = self.Header(version, new_filename, header_SW_1, new_masks[0], cosmic=True, cosmic_extname=header_SW_0['EXTNAME'])
-        header_LW_1 = self.Header(version, new_filename, header_LW_1, new_masks[0], cosmic=True, cosmic_extname=header_LW_0['EXTNAME'])
+        header_SW_1 = self.Header(version, new_filename, header_SW_1, new_masks[0], cosmic=True, cosmic_extname='Cosmic ray pixels for SW')
+        header_LW_1 = self.Header(version, new_filename, header_LW_1, new_masks[0], cosmic=True, cosmic_extname='Cosmic ray pixels for LW')
         return [[header_SW_0, header_LW_0], [header_SW_1, header_LW_1]]
     
-    def Header(self, version, new_filename, header, image, cosmic: bool = False, cosmic_extname: str = ''):
+    def Header(self, version, new_filename, header, image, cosmic_extname: str, cosmic: bool = False):
         """
         To get the values needed for the headers.
         """
@@ -263,7 +263,7 @@ class Cosmicremoval_class:
         # The dictionary with all the header statistics
         headers_dict = {
             'EXTNAME': [cosmic_extname, 'Extension name'],
-            'FILENAME': [new_filename, 'Filenam'],
+            'FILENAME': [new_filename, 'Filename'],
             'NWIN': [4, 'Total number of windows in this file'],
             'NWIN_PRF': [4, 'Number of windows not Dumbbell or Intensity'],
             'VERSION': [f'{version:02d}      ', 'Incremental file version number'],
@@ -330,7 +330,7 @@ class Cosmicremoval_class:
             value_length = 7 if key not in ['DATARMS', 'DATANRMS', 'DATAMAD', 'DATASKEW', 'DATAKURT'] else 13
             value_string = self.Header_value_length(value, value_length) if not isinstance(value, str) else f" '{value}'"
             header_strings_n_key.append( 
-                (key, f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}')
+                (key, f'{self.Format_string_left(key, self.header_key_length)}={self.Format_string_right(value_string, self.header_value_length)} / {comment}'[:80])
             )
         return header_strings_n_key    
         
