@@ -290,15 +290,28 @@ class Cosmicremoval_class:
             headers_dict['EXTNAME'] = [cosmic_extname, 'Extension name']
 
         headers_string_n_key = self.Header_string(headers_dict)
-        headers_before = self.Header_order(list(headers_dict.keys()))
-        for (key, string) in headers_string_n_key:
-            header.remove(key)
-            header.insert(headers_before[key], fits.Card.fromstring(string), after=True)
+        # headers_before = self.Header_order(list(headers_dict.keys()))
+        # for (key, string) in headers_string_n_key:
+        #     header.remove(key)
+        #     header.insert(headers_before[key], fits.Card.fromstring(string), after=True)
 
-            # Adding a white space in the headers to get the initial formatting
-            if key in ['EXTNAME', 'NWIN', 'DATAMIN']:
-                header.insert(headers_before[key], fits.Card.fromstring(''), after=True)
-        return header
+        #     # Adding a white space in the headers to get the initial formatting
+        #     if key in ['EXTNAME', 'NWIN', 'DATAMIN']:
+        #         header.insert(headers_before[key], fits.Card.fromstring(''), after=True)
+        return self.Getting_the_new_header(headers_string_n_key, header._cards)
+    
+    def Getting_the_new_header(self, headers_string_n_key, cards):
+        """
+        To find the right header card and swap it with the new value.
+        """
+        
+        for (key, string) in headers_string_n_key:
+            for loop, card in enumerate(cards):
+                if card.keyword == key:
+                    break
+            del cards[loop]
+            cards.insert(loop, fits.Card.fromstring(string))
+        return fits.Header(cards=cards)
     
     def Header_order(self, keys: list):
         """

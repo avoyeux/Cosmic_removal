@@ -81,15 +81,10 @@ class SpiceUtils:
         date = parse_date(d['time'])
 
         test_path = os.path.join('//idc-archive/SOLO', 'SPICE')
-
-        if os.path.exists(test_path):
-            main_path = test_path
-        else:
-            main_path = os.path.join('/archive', 'SOLAR-ORBITER', 'SPICE')
-
+        main_path = test_path if os.path.exists(test_path) else os.path.join('/archive', 'SOLAR-ORBITER', 'SPICE')
+        
         fullpath = os.path.join(main_path, 'fits', 'level' + d['level'].lstrip('L'), f'{date.year:04d}',
                                 f'{date.month:02d}', f'{date.day:02d}', filename)
-
         return fullpath
 
 
