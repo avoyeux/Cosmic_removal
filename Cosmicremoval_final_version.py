@@ -290,15 +290,15 @@ class Cosmicremoval_class:
             headers_dict['EXTNAME'] = [cosmic_extname, 'Extension name']
 
         headers_string_n_key = self.Header_string(headers_dict)
-        # headers_before = self.Header_order(list(headers_dict.keys()))
-        # for (key, string) in headers_string_n_key:
-        #     header.remove(key)
-        #     header.insert(headers_before[key], fits.Card.fromstring(string), after=True)
+        new_header = self.Getting_the_new_header(headers_string_n_key, header._cards)
 
-        #     # Adding a white space in the headers to get the initial formatting
-        #     if key in ['EXTNAME', 'NWIN', 'DATAMIN']:
-        #         header.insert(headers_before[key], fits.Card.fromstring(''), after=True)
-        return self.Getting_the_new_header(headers_string_n_key, header._cards)
+        # Setting the forced comment changes from astropy back to the initially used one
+        keys_changed = [
+            'SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'NAXIS3', 'NAXIS4', 'EXTEND', 'BSCALE', 'BZERO',
+        ]
+        for key in keys_changed:
+            new_header[key].comments = header[key].comments
+        return new_header
     
     def Getting_the_new_header(self, headers_string_n_key, cards):
         """
@@ -312,25 +312,6 @@ class Cosmicremoval_class:
             del cards[loop]
             cards.insert(loop, fits.Card.fromstring(string))
         return fits.Header(cards=cards)
-    
-    def Header_order(self, keys: list):
-        """
-        To place the updated headers in the right place. .set() is not used here as I have to use .Card
-        objects to comply to the initial formatting.
-        """
-
-        headers_before = {
-            'EXTNAME': 'DATE',
-            'FILENAME': 'EXTNAME',
-            'NWIN': 'SVO_GRP',
-            'NWIN_PRF': 'NWIN',
-            'VERSION': 'VERS_SW',
-            'DATAMIN': 'PCT_APRX',
-        }      
-
-        for loop in  range(6, len(keys)):
-            headers_before[keys[loop]] = keys[loop - 1]
-        return headers_before
 
     def Header_string(self, header_dict: dict) -> list:
         """
