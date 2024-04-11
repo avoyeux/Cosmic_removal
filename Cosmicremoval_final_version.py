@@ -238,12 +238,8 @@ class Cosmicremoval_class:
         init_header_SW = fits.getheader(common.SpiceUtils.ias_fullpath(old_filename), 0)
         init_header_LW = fits.getheader(common.SpiceUtils.ias_fullpath(old_filename), 1)
 
-        print(f'the init headers are {init_header_SW}')
-        print(f'and {init_header_LW}', flush=True)
-
         # Creating the new headers
         header_SW_0, header_LW_0 = init_header_SW.copy(), init_header_LW.copy()
-        print(f'the copy for the SW gives {header_SW_0}')
         header_SW_0 = self.Header(version, new_filename, header_SW_0, new_images[0], cosmic_extname=header_SW_0['EXTNAME'])
         header_LW_0 = self.Header(version, new_filename, header_LW_0, new_images[1], cosmic_extname=header_LW_0['EXTNAME'])
 
@@ -296,6 +292,8 @@ class Cosmicremoval_class:
         headers_string_n_key = self.Header_string(headers_dict)
         new_header = self.Getting_the_new_header(headers_string_n_key, header._cards)
 
+        print(f'The new header is {new_header}', flush=True)
+
         # Setting the forced comment changes from astropy back to the initially used one
         # keys_changed = [
         #     'SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'NAXIS3', 'NAXIS4', 'EXTEND', 'BSCALE', 'BZERO',
@@ -308,7 +306,7 @@ class Cosmicremoval_class:
         """
         To find the right header card and swap it with the new value.
         """
-        print(f'The corresponding cards for the header copy are {cards}', flush=True)
+        print(f'The corresponding cards for the header copy are {cards[:10]}', flush=True)
 
         for (key, string) in headers_string_n_key:
             for loop, card in enumerate(cards):
