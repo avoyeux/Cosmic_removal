@@ -227,6 +227,12 @@ class Cosmicremoval_class:
             hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=headers[1][1]))
             hdul_new = fits.HDUList(hdul_new)
             hdul_new.writeto(new_filename, overwrite=True)
+
+            # Opening the hdul to check what the new headers are
+            for loop in range(10):
+                print()
+            new_header = fits.getheader(new_filename)
+            print(f'the header after reopening the new fits file is {new_header}')
             print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
 
     def Changing_the_hdu_headers(self, old_filename, new_filename, new_images, new_masks, version):
