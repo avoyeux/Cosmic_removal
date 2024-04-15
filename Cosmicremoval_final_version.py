@@ -302,8 +302,6 @@ class Cosmicremoval_class:
         headers_string_n_key = self.Header_string(headers_dict)
         new_header = self.Getting_the_new_header(headers_string_n_key, header._cards)
 
-        print(f'The new header is {new_header}', flush=True)
-
         # Setting the forced comment changes from astropy back to the initially used one
         # keys_changed = [
         #     'SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'NAXIS3', 'NAXIS4', 'EXTEND', 'BSCALE', 'BZERO',
