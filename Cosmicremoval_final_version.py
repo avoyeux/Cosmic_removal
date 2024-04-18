@@ -30,7 +30,7 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     @typechecked
-    def __init__(self, processes: int = 1, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4,
+    def __init__(self, processes: int = 15, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4,
                 time_interval: int = 6, bins: int = 5, plots: bool = True):
         
         # Arguments
@@ -200,7 +200,11 @@ class Cosmicremoval_class:
             new_images = []
             for detector in range(2):
                 mode, mad = self.Mad_mean(interval_filenames, detector)
-                image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
+                if os.path.exists(os.path.join(common.SpiceUtils.ias_fullpath(filename))):
+                    image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
+                else:
+                    print("filename doesn't exist, adding a +1 to the version number")
+                    image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(new_filename), detector)[0, :, :, 0], dtype='float64')
                 mask = image > self.coef * mad + mode
                 
                 nw_image = np.copy(image)
@@ -226,17 +230,12 @@ class Cosmicremoval_class:
             hdul_new.append(fits.ImageHDU(data=treated_pixels[0], header=headers[1][0]))
             hdul_new.append(fits.ImageHDU(data=treated_pixels[1], header=headers[1][1]))
             hdul_new = fits.HDUList(hdul_new)
-            for loop in range(7):
-                print()
-            print(f'the header before saving the fit is {hdul_new[0].header}')
-            
             hdul_new.writeto(new_filename, overwrite=True)
 
             # Opening the hdul to check what the new headers are
             for loop in range(10):
                 print()
             new_header = fits.getheader(new_filename)
-            print(f'the header after reopening the new fits file is {new_header}')
             print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
 
     def Changing_the_hdu_headers(self, old_filename, new_filename, new_images, new_masks, version):
@@ -314,7 +313,6 @@ class Cosmicremoval_class:
         """
         To find the right header card and swap it with the new value.
         """
-        print(f'The corresponding cards for the header copy are {cards[:10]}', flush=True)
 
         for (key, string) in headers_string_n_key:
             for loop, card in enumerate(cards):
@@ -350,12 +348,15 @@ class Cosmicremoval_class:
         Changing the value to a string of a given size (i.e. adding decimals or taking some away).
         """
 
-        a = 0
-        if value < 0:
-            a += 1 if len(str(int(value))) != 1 else 0
-        int_length = len(str(int(value)))
-        number = a + length - (int_length + 1)
-        return format(value, f'.{number}f') if number > 0 else str(int(value)) + '.' if number == 0 else str(int(value))  
+        if not isinstance(value, int):
+            a = 0
+            if value < 0:
+                a += 1 if len(str(int(value))) != 1 else 0
+            int_length = len(str(int(value)))
+            number = a + length - (int_length + 1)
+            return format(value, f'.{number}f') if number > 0 else str(int(value)) + '.' if number == 0 else str(int(value))  
+        else:
+            return f'{value}'
     
     def Format_string_right(self, string: str, length: int) -> str:
         """
