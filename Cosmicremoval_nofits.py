@@ -2,8 +2,11 @@
 import os
 import sys
 import re
-import common
 import warnings
+
+import common
+import common_alf_new
+
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
@@ -30,8 +33,8 @@ class Cosmicremoval_class:
     res = cat[filters]
 
     @typechecked
-    def __init__(self, processes: int = 20, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 6,
-                time_interval: int = 6, bins: int = 5, plots: bool = True):
+    def __init__(self, processes: int = 20, max_date: str | None = '20230402T030000', coefficient: int | float = 6, min_filenb: int = 20, 
+                 set_min: int = 6, time_interval: int = 6, bins: int = 5, plots: bool = True):
         
         # Arguments
         self.processes = processes
@@ -42,6 +45,7 @@ class Cosmicremoval_class:
         # self.time_intervals = time_intervals
         self.time_interval = time_interval
         self.bins = bins
+        self.max_date = max_date if max_date else '30000100T000000'  # maximum date for which the treatment is done 
 
         # Code functions
         self.exposures = self.Exposure()
@@ -177,7 +181,7 @@ class Cosmicremoval_class:
             for exposure, nb, _ in results
             ], columns=['Exposure', 'Processed'])
         processed_nb_df.sort_values(by='Exposure')
-        total_processed = processed_nb_df['Processed'].sum().round()
+        total_processed = processed_nb_df['Processed'].sum()
         total_processed_df = pd.DataFrame({
             'Exposure': ['Total'],
             'Processed': [total_processed],
@@ -187,16 +191,34 @@ class Cosmicremoval_class:
         filenames_df = pd.DataFrame([
             filename for _, _, filename_list in results for filename in filename_list
             ], columns=['Filenames'])
+        filenames_df.sort_values(by='Filenames')
         
         # Saving both stats
         df1_name = 'Nb_of_processed_darks.csv'
         processed_nb_df.to_csv(df1_name, index=False)
-        df2_name = 'Processed_SPIOBSID.csv'
+        df2_name = 'Processed_filenames.csv'
         filenames_df.to_csv(df2_name, index=False)
         
     @decorators.running_time
     def Main(self, queue, exposure):
         print(f'The process id is {os.getpid()}')
+        filename_pattern = re.compile(
+                r"""
+                solo
+                _(?P<level>L[123])
+                _spice
+                    (?P<concat>-concat)?
+                    -(?P<slit>[wn])
+                    -(?P<type>(ras|sit|exp))
+                    (?P<db>-db)?
+                    (?P<int>-int)?
+                _(?P<time>\d{8}T\d{6})
+                _V(?P<version>\d{2})
+                _(?P<SPIOBSID>\d+)-(?P<RASTERNO>\d+)
+                \.fits
+                """,
+                re.VERBOSE)
+        
         # MAIN LOOP
         # Initialisation of the stats for csv file saving
         filenames = self.Images_all(exposure)
@@ -211,17 +233,28 @@ class Cosmicremoval_class:
 
         # print(f'Inter{self.time_interval}_exp{exposure} -- Starting chunks.')
         processed_darks_total_nb = 0
-        processed_SPIOBSID = []
+        processed_filenames = []
         for loop, filename in enumerate(filenames):
-            SPIOBSID = None
-            for key in same_darks.keys():
-                if filename in same_darks[key]:
-                    SPIOBSID = key
-                    break
-            if len(same_darks[SPIOBSID]) > 3:
-                print(f'\033[31mInter{self.time_interval}_exp{exposure}_imgnb{loop}'
-                      f'-- Image from a SPIOBSID set of 4 or more darks. Going to the next acquisition.\033[0m')
-                continue
+            
+            pattern_match = filename_pattern.match(filename)
+            if pattern_match:
+                SPIOBSID = pattern_match.group('SPIOBSID')
+                date = pattern_match.group('time')
+                init_version = int(pattern_match.group('version'))
+                new_version = init_version + 1
+                new_filename = common_alf_new.RE.replace_group(pattern_match, 'version', f'{new_version:02d}')
+            else:
+                raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
+            
+            length = len(same_darks[SPIOBSID])
+            if length > 3:
+                if date > self.max_date:
+                    print(f'\033[31mInter{self.time_interval}_exp{exposure}_imgnb{loop}'
+                          f'-- Image from a SPIOBSID set of {length}. Going to the next acquisition.\033[0m')
+                    continue
+                else:
+                    print(f'Image from a SPIOBSID set of {length} darks but before May 2023.')
+            
 
             interval_filenames = self.Time_interval(filename, filenames)
             # print(f'Inter{self.time_interval}_exp{exposure}_imgnb{loop}'
@@ -234,21 +267,7 @@ class Cosmicremoval_class:
 
             # For stats
             processed_darks_total_nb += 1
-            processed_SPIOBSID.append(SPIOBSID)
-
-            # Setting the filename for the new fits file:
-            filename_pattern = re.compile(r'''(?P<group1>solo_L1_spice-n-exp_\d{8}T\d{6}_
-                                V)(?P<version>\d{2})
-                                (?P<group2>_\d+-\d+.fits)
-                                ''', re.VERBOSE)
-
-            matching = filename_pattern.match(filename)
-            if matching:
-                init_version = int(matching.group('version'))
-                new_version = init_version + 1
-                new_filename = f"{matching.group('group1')}{new_version:02d}{matching.group('group2')}"
-            else:
-                raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
+            processed_filenames.append(filename)                
             
             new_images = []
             check = None
@@ -294,9 +313,9 @@ class Cosmicremoval_class:
             print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
         print(f'\033[1;33mFor exposure {exposure}, {processed_darks_total_nb} files processed\033[0m')
         if self.processes > 1:
-            queue.put((exposure, processed_darks_total_nb, processed_SPIOBSID))
+            queue.put((exposure, processed_darks_total_nb, processed_filenames))
         else:
-            return (exposure, processed_darks_total_nb, processed_SPIOBSID)
+            return (exposure, processed_darks_total_nb, processed_filenames)
 
     def Time_interval(self, filename, files):
         """

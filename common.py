@@ -57,13 +57,8 @@ class SpiceUtils:
             main_path = os.path.join('/archive', 'SOLAR-ORBITER', 'SPICE')
 
         cat_file = os.path.join(main_path, 'fits', 'spice_catalog.csv')
-        columns = list(pd.read_csv(cat_file, nrows=0).keys())
         date_columns = ['DATE-BEG', 'DATE', 'TIMAQUTC']
         df = pd.read_csv(cat_file, low_memory=False, na_values="MISSING", parse_dates=date_columns)
-        # df = pd.read_table(
-        #     cat_file, skiprows=1, names=columns, na_values="MISSING",
-        #     parse_dates=date_columns, low_memory=False
-        #     )
         df.LEVEL = df.LEVEL.apply(lambda string: string.strip() if isinstance(string, str) else string)
         df.STUDYTYP = df.STUDYTYP.apply(lambda string: string.strip() if isinstance(string, str) else string)
         return df
