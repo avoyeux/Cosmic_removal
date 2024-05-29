@@ -16,8 +16,7 @@ from dateutil.parser import parse as parse_date
 from multiprocessing.queues import Queue as QUEUE
 
 # Personnal codes
-import common
-from common_alf import RE, Decorators
+from Common import RE, SpiceUtils, Decorators
 
 
 # Creating a class for the cosmicremoval
@@ -28,13 +27,13 @@ class CosmicRemoval:
     """
 
     # Finding the L1 darks
-    cat = common.SpiceUtils.read_spice_uio_catalog()
+    cat = SpiceUtils.read_spice_uio_catalog()
     filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
     res = cat[filters]
 
     @typechecked
     def __init__(self, multiprocessing: bool = True, max_date: str | None = '20230402T030000', coefficient: int | float = 6, min_filenb: int = 20, 
-                 set_min: int = 6, time_interval: int = 6, bins: int = 5, verbose: int = 1):
+                 set_min: int = 4, time_interval: int = 6, bins: int = 5, verbose: int = 1):
         """To initialise but also run the CosmicRemoval class.
 
         Args:
@@ -125,7 +124,7 @@ class CosmicRemoval:
         all_files = []
         for files in filenames:
             # Opening the files
-            header = fits.getheader(common.SpiceUtils.ias_fullpath(files), 0)
+            header = fits.getheader(SpiceUtils.ias_fullpath(files), 0)
 
             if header['BLACKLEV'] == 1: left_nb += 1; continue
             OBS_DESC = header['OBS_DESC'].lower()
@@ -297,11 +296,11 @@ class CosmicRemoval:
             check = False
             for detector in range(2):
                 mode, mad = self.Mad_mean(interval_filenames, detector)
-                if os.path.exists(os.path.join(common.SpiceUtils.ias_fullpath(filename))):
-                    image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
+                if os.path.exists(os.path.join(SpiceUtils.ias_fullpath(filename))):
+                    image = np.array(fits.getdata(SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64')
                 else:
                     if self.verbose > 2: print("filename doesn't exist, adding a +1 to the version number")
-                    image = np.array(fits.getdata(common.SpiceUtils.ias_fullpath(new_filename), detector)[0, :, :, 0], dtype='float64')
+                    image = np.array(fits.getdata(SpiceUtils.ias_fullpath(new_filename), detector)[0, :, :, 0], dtype='float64')
                 mask = image > self.coef * mad + mode
                 
                 nw_image = np.copy(image)
@@ -316,8 +315,8 @@ class CosmicRemoval:
             new_images = np.array(new_images, dtype='uint16')
 
             # Headers
-            init_header_SW = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 0)
-            init_header_LW = fits.getheader(common.SpiceUtils.ias_fullpath(filename), 1)
+            init_header_SW = fits.getheader(SpiceUtils.ias_fullpath(filename), 0)
+            init_header_LW = fits.getheader(SpiceUtils.ias_fullpath(filename), 1)
 
             if (init_header_LW['NLOSTPIX'] != 0) or (init_header_SW['NLOSTPIX'] != 0):
                 if not check: raise ValueError(f"There should have been a bright blue print before but didn't happen. Filename: {filename}")
@@ -349,7 +348,7 @@ class CosmicRemoval:
             list[str]: list of the filenames in the given interval time.
         """
 
-        name_dict = common.SpiceUtils.parse_filename(filename)
+        name_dict = SpiceUtils.parse_filename(filename)
         date = parse_date(name_dict['time'])
 
         year_max = date.year
@@ -371,7 +370,7 @@ class CosmicRemoval:
         for interval_filename in files:
             if interval_filename == filename: continue
 
-            name_dict = common.SpiceUtils.parse_filename(interval_filename)
+            name_dict = SpiceUtils.parse_filename(interval_filename)
             date = name_dict['time']
 
             if (date >= date_min) and (date <= date_max): interval_filenames.append(interval_filename)
@@ -401,7 +400,7 @@ class CosmicRemoval:
         """
 
         images = np.array([
-            np.array(fits.getdata(common.SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64') 
+            np.array(fits.getdata(SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0], dtype='float64') 
             for filename in filenames
         ]) 
 
@@ -426,7 +425,7 @@ class CosmicRemoval:
         # Dictionaries initialisation
         same_darks = {}
         for filename in filenames:
-            d = common.SpiceUtils.parse_filename(filename)
+            d = SpiceUtils.parse_filename(filename)
             SPIOBSID = d['SPIOBSID']
             if SPIOBSID not in same_darks:
                 same_darks[SPIOBSID] = []
@@ -441,5 +440,5 @@ if __name__ == '__main__':
 
     print(f'Python version is {sys.version}')
 
-    test = CosmicRemoval()
+    test = CosmicRemoval(verbose=2)
 
