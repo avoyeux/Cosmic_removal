@@ -1,4 +1,7 @@
 *
+!.gitignore
+!/Common/
+!Common/*
 !*.py
 !*.txt
 !*.md
