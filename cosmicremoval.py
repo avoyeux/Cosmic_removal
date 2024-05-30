@@ -15,7 +15,7 @@ from multiprocessing import Process, Manager
 from dateutil.parser import parse as parse_date
 from multiprocessing.queues import Queue as QUEUE
 
-# Personnal codes
+# Local Python files
 from Common import RE, SpiceUtils, Decorators
 
 
@@ -33,7 +33,7 @@ class CosmicRemoval:
 
     @typechecked
     def __init__(self, multiprocessing: bool = True, max_date: str | None = '20230402T030000', coefficient: int | float = 6, min_filenb: int = 20, 
-                 set_min: int = 4, time_interval: int = 6, bins: int = 5, verbose: int = 1):
+                 set_min: int = 6, time_interval: int = 6, bins: int = 5, plots: bool = False, fits: bool = True, statistics: bool = True, verbose: int = 1):
         """To initialise but also run the CosmicRemoval class.
 
         Args:
@@ -54,6 +54,9 @@ class CosmicRemoval:
         self.set_min = set_min
         self.time_interval = time_interval  # time interval considered in months (e.g. 6 is 3 months prior and after each acquisition)
         self.bins = bins
+        self.making_plots = plots
+        self.making_statistics = statistics
+        self.creating_fits = fits
         self.max_date = max_date if max_date is not None else '30000100T000000'  # maximum date for which the treatment is done for multi-darks
         self.verbose = verbose
 
@@ -62,6 +65,75 @@ class CosmicRemoval:
         self.Multiprocess()
 
     ################################################ INITIAL functions #################################################
+    def Paths(self, time_interval: int = -1, exposure: float = -0.1, detector: int = -1) -> dict[str, str]:
+        """Function to create all the different paths. Lots of if statements to be able to create the needed directories 
+        depending on the arguments.
+
+        Args:
+            time_interval (int, optional): if not -1, creates the corresponding time_interval directory. Defaults to -1.
+            exposure (float, optional): if not -1, creates the corresponding exposure directory. Defaults to -0.1.
+            detector (int, optional): if not -1, creates the corresponding directory. Defaults to -1.
+            fits (bool, optional): if True, then cosmic treated FITS files are created. IMPORTANT: The files will have a 
+            wrong filename and header info... Defaults to True.
+
+        Returns:
+            dict[str, str]: the dictionary with keys as argument names (except the 'main' key) and values as the path to the 
+            corresponding directory.
+        """
+
+        main_path = os.path.join(os.getcwd(), 'statisticsAndPlots')
+
+        if time_interval != -1:
+            time_path = os.path.join(main_path, f'Date_interval{time_interval}')
+
+            if exposure != -1:
+                exposure_path = os.path.join(time_path, f'Exposure{exposure}')
+
+                if detector != -1:
+                    detector_path = os.path.join(exposure_path, f'Detector{detector}')
+
+                    # Main paths
+                    initial_paths = {
+                        'main': main_path,
+                        'time_interval': time_path, 
+                        'exposure': exposure_path,
+                        'detector': detector_path,
+                    }
+
+                    # Secondary paths
+                    directories = []
+                    if self.fits: directories.append('FITS')
+                    if self.making_statistics: directories.append('Statistics')
+                    if self.making_plots: directories.append('Special_histograms')
+
+                    paths = {}
+                    for directory in directories:
+                        path = os.path.join(detector_path, directory)
+                        paths[directory] = path
+                else:
+                    initial_paths = {
+                        'Main': main_path, 
+                        'Time interval': time_path, 
+                        'Exposure': exposure_path,
+                    }
+                    paths = {}
+            else:
+                initial_paths = {
+                    'Main': main_path,
+                    'Time interval': time_path,
+                }
+                paths = {}
+        else:
+            initial_paths = {'Main': main_path}
+            paths = {}
+
+        all_paths = {}
+        for d in [initial_paths, paths]:
+            for _, path in d.items():
+                os.makedirs(path, exist_ok=True)
+            all_paths.update(d)
+        return all_paths
+    
     def Exposure(self) -> list[float]:
         """Function to find the different exposure times in the SPICE catalogue.
 
@@ -81,33 +153,37 @@ class CosmicRemoval:
         exposure_used = exposure_weighted[occurrences_filter][:, 0]
 
         if self.verbose > 0:
-            print(f'\033[93mExposure times with less than \033[1m{self.min_filenb}\033[0m\033[93m darks are not kept.'
-                f'\033[0m')
+            print(f'\033[93mExposure times with less than \033[1m{self.min_filenb}\033[0m\033[93m darks are not kept.\033[0m')
             print(f'\033[33mExposure times kept are {exposure_used}\033[0m')
 
-        # Saving exposure stats
-        csv_name = 'Nb_of_darks.csv'
-        exp_dict = {'Exposure time (s)': exposure_weighted[:, 0], 'Total number of darks': exposure_weighted[:, 1]}
-        pandas_dict = pd.DataFrame(exp_dict)
-        sorted_dict = pandas_dict.sort_values(by='Exposure time (s)')
+        if self.making_statistics:
+            # Saving exposure stats
+            paths = self.Paths()
+            csv_name = 'Nb_of_darks.csv'
+            exp_dict = {
+                'Exposure time (s)': exposure_weighted[:, 0],
+                'Total number of darks': exposure_weighted[:, 1],
+            }
+            pandas_dict = pd.DataFrame(exp_dict)
+            sorted_dict = pandas_dict.sort_values(by='Exposure time (s)')
 
-        total_darks = sorted_dict['Total number of darks'].sum().round()
-        total_row = pd.DataFrame({
-            'Exposure time (s)': ['Total'], 
-            'Total number of darks': [total_darks],
-        })
-        sorted_dict = pd.concat([sorted_dict, total_row], ignore_index=True)
-        sorted_dict.to_csv(csv_name, index=False)
+            total_darks = sorted_dict['Total number of darks'].sum().round()
+            total_row = pd.DataFrame({
+                'Exposure time (s)': ['Total'], 
+                'Total number of darks': [total_darks],
+            })
+            sorted_dict = pd.concat([sorted_dict, total_row], ignore_index=True)
+            sorted_dict.to_csv(os.path.join(paths['Main'], csv_name), index=False)
         return exposure_used
     
-    def Images_all(self, exposure: float) -> np.ndarray | list[None]:
+    def Images_all(self, exposure: float) -> list[str | None]:
         """Function to get, for a certain exposure time, the corresponding filenames.
 
         Args:
             exposure (float): the exposure time that is going to be studied.
 
         Returns:
-            np.ndarray | list[None]: list of all the usable filenames found for the exposure time.
+            list[str | None]: list of all the usable filenames found for the exposure time.
         """
 
         # Filtering the data by exposure time
@@ -136,7 +212,6 @@ class CosmicRemoval:
             if temp1 > 0 and temp2 > 0: a += 1; continue
 
             all_files.append(files)
-        all_files = np.array(all_files)
 
         if self.verbose > 1:
             if a != 0: print(f'\033[31mExp{exposure} -- Tot nb files with high temp: {a}\033[0m')
@@ -169,10 +244,10 @@ class CosmicRemoval:
             results = []
             while not queue.empty():
                 results.append(queue.get())
-            self.Saving_main_numbers(results)
         else:
-            data = [self.Main(exposure) for exposure in self.exposures]
-            self.Saving_main_numbers(data)
+            results = [self.Main(exposure) for exposure in self.exposures]
+
+        if self.making_statistics: self.Saving_main_numbers(results)
 
     def Saving_main_numbers(self, results: tuple[float, int, list[str]]) -> None:
         """Saving the number of files processed and which SPIOBSID were processed.
@@ -336,7 +411,7 @@ class CosmicRemoval:
         if not self.multiprocessing: return (exposure, processed_darks_total_nb, processed_filenames)
         queue.put((exposure, processed_darks_total_nb, processed_filenames))
 
-    def Time_interval(self, filename: str, files: np.ndarray) -> list[str]:
+    def Time_interval(self, filename: str, files: list[str | None]) -> list[str]:
         """Finding the images in the time interval specified for a given filename. Hence, we are getting the sequences of images needed for each individual
         dark treatment.
 
@@ -411,7 +486,7 @@ class CosmicRemoval:
         mads = np.mean(np.abs(images - modes), axis=0).astype('float64')
         return modes, mads 
 
-    def Samedarks(self, filenames: np.ndarray) -> dict[str, str]:
+    def Samedarks(self, filenames: list[str | None]) -> dict[str, str]:
         """To get a dictionary with the keys representing the possible SPIOBSIDs and the values the corresponding filenames.
         Hence, it can also give you the number of darks per SPIOBSID.
 
