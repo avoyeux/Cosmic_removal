@@ -30,14 +30,6 @@ class ParentFunctions:
     """Parent class to the Cosmic removal classes as I have created two really similar classes. The first for actually treating the single darks and the
     second to plot and compute some statistics on the multi-darks (to have an idea of the efficiency of the cosmic removal).
     Therefore, this class is only here to store the common functions to both the following classes.
-
-    Raises:
-        ValueError: _description_
-        ValueError: _description_
-        ValueError: _description_
-
-    Returns:
-        _type_: _description_
     """
 
     def __init__(self, fits: bool, statistics: bool, plots: bool, verbose: int):
@@ -303,9 +295,9 @@ class CosmicRemoval(ParentFunctions):
             queue = manager.Queue()
             indexes = MultiProcessing.Pool_indexes(len(self.exposures), self.processes)
 
-            if self.verbose > 0: print(f'Number of processes used is: {len(indexes)}.', flush=True)
+            if self.verbose > 0: print(f'Number of processes used is: {len(indexes) * (self.processes // len(self.exposures))}.', flush=True)
 
-            processes = [Process(target=self.Main, args=(queue, index)) for index in indexes]            
+            processes = [Process(target=self.Main, args=(index, queue)) for index in indexes]            
             for p in processes: p.start()
             for p in processes: p.join()
 
@@ -315,21 +307,17 @@ class CosmicRemoval(ParentFunctions):
             results = self.Main((0, len(self.exposures) - 1))
 
         if self.making_statistics: self.Saving_main_numbers(results)
-
-    def Main(self, index: tuple[int, int], queue: QUEUE | None = None) -> None | list[tuple[float, int, list[str]]]:
+    
+    @Decorators.running_time
+    def Main(self, index: tuple[int, int], queue: QUEUE | None = None) -> list[tuple[float, list[str]]] | None:
         """Main structure of the code after the multiprocessing. Does the treatment given an exposure time and outputs the results.
 
         Args:
             index (tuple[int, int]): the data's start and end index for each process. 
-            queue (QUEUE): a multiprocessing.Manager.Queue() object.
-
-        Raises:
-            ValueError: if the filenames doesn't match the usual SPICE FITS filenames.
-            ValueError: if there are no NANs in the acquisitions but the header information said there are.
-            ValueError: if there are NANs in the acquisitions but the header information didn't say so.
+            queue (QUEUE | None): a multiprocessing.Manager.Queue() object. Defaults to None.
 
         Returns:
-            None | tuple[float, int, list[str]]: contains the exposure time, the nb of files and the corresponding filenames list if not multiprocessing. Else,
+            None | tuple[float, list[str]]: contains the exposure time and the corresponding filenames list if not multiprocessing. Else,
             just populates the queue with those values.
         """        
 
@@ -337,8 +325,8 @@ class CosmicRemoval(ParentFunctions):
         if not self.multiprocessing: results = [None] * len(self.exposures)
 
         # Deciding to also set multiprocessing if needed
-        multiprocessing = self.multiprocessing and ((len(self.exposures) - self.processes) // len(filenames) != 0)
-
+        processes_needed = self.processes // len(self.exposures)
+        multiprocessing = self.multiprocessing and (processes_needed > 1)
         paths = self.Paths()
 
         for i, exposure in enumerate(self.exposures[index[0]:index[1] + 1]):
@@ -350,94 +338,138 @@ class CosmicRemoval(ParentFunctions):
 
             # MULTIPLE DARKS analysis
             same_darks = self.Samedarks(filenames)
+            kwargs = {
+                'exposure': exposure,
+                'filenames': filenames,
+                'same_darks': same_darks,
+                'paths': paths,
+            }
 
-            # Multiprocessing
-            manager = Manager()
-            queue = manager.Queue()
-            indexes = MultiProcessing.Pool_indexes(len(filenames), self.processes)
-            # TODO: need to finish here
+            if multiprocessing:
+                # Multiprocessing
+                manager = Manager()
+                sub_queue = manager.Queue()
+                indexes = MultiProcessing.Pool_indexes(len(filenames), processes_needed)
 
-            processed_darks_total_nb = 0
-            processed_filenames = []
-            for loop, filename in enumerate(filenames):
-                pattern_match = CosmicRemoval.filename_pattern.match(filename)
+                processes = [
+                    Process(target=self.Exposure_loop, kwargs={'index': index, 'queue': sub_queue, 'position': pos, **kwargs}) 
+                    for pos, index in enumerate(indexes)
+                ]
+                for p in processes: p.start()
+                for p in processes: p.join()
 
-                if pattern_match:
-                    SPIOBSID = pattern_match.group('SPIOBSID')
-                    date = pattern_match.group('time')
-                    new_filename = RE.replace_group(pattern_match, 'version', f'{99}')
-                else:
-                    raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
-                
-                length = len(same_darks[SPIOBSID])
-                if length > 3:
-                    if date > self.max_date:
-                        if self.verbose > 1: print(f'\033[31mExp{exposure}_imgnb{loop} -- {length} images in SPIOBSID. Going to the next acquisition.\033[0m')
-                        continue
-                    elif self.verbose > 1:
-                        print(f'Image from a SPIOBSID set of {length} darks but before May 2023.')
-                
-                interval_filenames = self.Time_interval(filename, filenames)
-                if len(interval_filenames) < self.set_min:
-                    if self.verbose > 1: print(f'\033[31mExp{exposure}_imgnb{loop} -- Set is only of {self.set_min} files. Going to the next filename.\033[0m')
-                    continue
-
-                # For stats
-                processed_darks_total_nb += 1
-                processed_filenames.append(filename)                
-
-                check = False
-                new_images = []
-                for detector in range(2):
-                    mode, mad = self.Mad_mean(interval_filenames, detector)
-                    if os.path.exists(os.path.join(SpiceUtils.ias_fullpath(filename))):
-                        image = fits.getdata(SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0]  #TODO: need to check if I need float64 and if np.stack has a dtype argument
-                    else:
-                        if self.verbose > 2: print("filename doesn't exist, adding a +1 to the version number")
-                        image = fits.getdata(SpiceUtils.ias_fullpath(new_filename), detector)[0, :, :, 0]
-                    mask = image > self.coef * mad + mode     
-
-                    nw_image = np.copy(image)  # TODO: need to check why np.copy is not the preferred copy method.
-                    nw_image[mask] = mode[mask]
-                    nw_image = nw_image[np.newaxis, :, :, np.newaxis]
-                    if np.isnan(image).any():
-                        if self.verbose > 1: print(f'\033[1;94mImage contains nans: {np.isnan(nw_image).any()}\033[0m')
-                        nw_image[np.isnan(nw_image)] = 65535 
-                        check = True
-                    new_images.append(nw_image)
-                new_images = np.stack(new_images, axis=0).astype('uint16')
-
-                # Headers
-                init_header_SW = fits.getheader(SpiceUtils.ias_fullpath(filename), 0)
-                init_header_LW = fits.getheader(SpiceUtils.ias_fullpath(filename), 1)
-
-                if (init_header_LW['NLOSTPIX'] != 0) or (init_header_SW['NLOSTPIX'] != 0):
-                    if not check: raise ValueError(f"There should have been a bright blue print before but didn't happen. Filename: {filename}")
-                else:
-                    if check: raise ValueError(f'Nans where found even though there are none in the headers. Filename: {filename}')
-
-                # Creating the total hdul
-                hdul_new = []
-                hdul_new.append(fits.PrimaryHDU(data=new_images[0], header=init_header_SW))
-                hdul_new.append(fits.ImageHDU(data=new_images[1], header=init_header_LW))
-                hdul_new = fits.HDUList(hdul_new)
-                hdul_new.writeto(os.path.join(paths['main'], new_filename), overwrite=True)
-
-                if self.verbose > 0: print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
-            if self.verbose > 0: print(f'\033[1;33mFor exposure {exposure}, {processed_darks_total_nb} files processed\033[0m')
+                sub_results = [None] * processes_needed
+                while not sub_queue.empty():
+                    identifier, result = sub_queue.get()
+                    sub_results[identifier] = result
+                processed_filenames = [filename for filename_list in sub_results for filename in filename_list]
+            else:
+                processed_filenames = self.Exposure_loop(index=(0, len(filenames) - 1), **kwargs)    
+            
+            if self.verbose > 0: print(f'\033[1;33mFor exposure {exposure}, {len(processed_filenames)} files processed\033[0m')
 
             if self.multiprocessing: 
-                queue.put((exposure, processed_darks_total_nb, processed_filenames))
+                queue.put((exposure, processed_filenames))
             else:
-                results[i] = (exposure, processed_darks_total_nb, processed_filenames)
+                results[i] = (exposure, processed_filenames)
         if not self.multiprocessing: return results
 
-    def Saving_main_numbers(self, results: tuple[float, int, list[str]]) -> None:
+    def Exposure_loop(self, exposure: float, filenames: list[str], same_darks: dict[str, str], paths: dict[str, str], index: tuple[int, int], 
+                      queue: QUEUE | None = None, position: int | None = None) -> list[str] | None:
+        """To loop over the filenames for each exposure times. Gives out the corresponding treated filenames with the exposure time used.
+
+        Args:
+            exposure (float): the exposure time used.
+            filenames (list[str]): the list of all the filenames in that exposure time.
+            same_darks (dict[str, str]): dictionary with .items() = (SPIOBSID, corresponding_dark_filenames).
+            paths (dict[str, str]): the path to the needed directories.
+            index (tuple[int, int]): the start and end index for each processes.
+            queue (QUEUE | None, optional): a multiprocessing.Manager.Queue() object. Defaults to None.
+            position (int | None, optional): the index representing the position in the parent loop. Defaults to None.
+
+        Raises:
+            ValueError: if the filenames doesn't match the usual SPICE FITS filenames.
+            ValueError: if there are no NANs in the acquisitions but the header information said there are.
+            ValueError: if there are NANs in the acquisitions but the header information didn't say so.
+
+        Returns:
+            list[str] | None: list of the processed filenames if not multiprocessing this function. Else, just populates the queue object.
+        """
+        
+        processed_filenames = []
+        for loop, filename in enumerate(filenames[index[0]:index[1] + 1]):
+            pattern_match = CosmicRemoval.filename_pattern.match(filename)
+
+            if pattern_match:
+                SPIOBSID = pattern_match.group('SPIOBSID')
+                date = pattern_match.group('time')
+                new_filename = RE.replace_group(pattern_match, 'version', f'{99}')
+            else:
+                raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
+            
+            length = len(same_darks[SPIOBSID])
+            if length > 3:
+                if date > self.max_date:
+                    if self.verbose > 1: print(f'\033[31mExp{exposure}_imgnb{loop} -- {length} images in SPIOBSID. Going to the next acquisition.\033[0m')
+                    continue
+                elif self.verbose > 1:
+                    print(f'Image from a SPIOBSID set of {length} darks but before May 2023.')
+            
+            interval_filenames = self.Time_interval(filename, filenames)
+            if len(interval_filenames) < self.set_min:
+                if self.verbose > 1: print(f'\033[31mExp{exposure}_imgnb{loop} -- Set is only of {self.set_min} files. Going to the next filename.\033[0m')
+                continue
+
+            processed_filenames.append(filename)                
+
+            check = False
+            new_images = []
+            for detector in range(2):
+                if os.path.exists(os.path.join(SpiceUtils.ias_fullpath(filename))):
+                    image = fits.getdata(SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0]  #TODO: need to check if I need float64 and if np.stack has a dtype argument
+                else:
+                    if self.verbose > 2: print("filename doesn't exist, adding a +1 to the version number")
+                    image = fits.getdata(SpiceUtils.ias_fullpath(new_filename), detector)[0, :, :, 0]
+                mode, mad = self.Mad_mean(interval_filenames, detector)
+                mask = image > self.coef * mad + mode     
+
+                nw_image = np.copy(image)  # TODO: need to check why np.copy is not the preferred copy method.
+                nw_image[mask] = mode[mask]
+                nw_image = nw_image[np.newaxis, :, :, np.newaxis]
+                if np.isnan(image).any():
+                    if self.verbose > 1: print(f'\033[1;94mImage contains nans: {np.isnan(nw_image).any()}\033[0m')
+                    nw_image[np.isnan(nw_image)] = 65535 
+                    check = True
+                new_images.append(nw_image)
+            new_images = np.stack(new_images, axis=0).astype('uint16')
+
+            # Headers
+            init_header_SW = fits.getheader(SpiceUtils.ias_fullpath(filename), 0)
+            init_header_LW = fits.getheader(SpiceUtils.ias_fullpath(filename), 1)
+
+            if (init_header_LW['NLOSTPIX'] != 0) or (init_header_SW['NLOSTPIX'] != 0):
+                if not check: raise ValueError(f"There should have been a bright blue print before but didn't happen. Filename: {filename}")
+            else:
+                if check: raise ValueError(f'Nans where found even though there are none in the headers. Filename: {filename}')
+
+            # Creating the total hdul
+            hdul_new = []
+            hdul_new.append(fits.PrimaryHDU(data=new_images[0], header=init_header_SW))
+            hdul_new.append(fits.ImageHDU(data=new_images[1], header=init_header_LW))
+            hdul_new = fits.HDUList(hdul_new)
+            hdul_new.writeto(os.path.join(paths['main'], new_filename), overwrite=True)
+
+            if self.verbose > 0: print(f'File nb{loop}, i.e. {filename}, processed.', flush=True)
+
+            if queue is None: return processed_filenames
+            queue.put((position, processed_filenames))
+
+    def Saving_main_numbers(self, results: tuple[float, list[str]]) -> None:
         """Saving the number of files processed and which SPIOBSID were processed.
         """
 
         paths = self.Paths()
-        processed_nb_df = pd.DataFrame([(exposure, nb) for exposure, nb, _ in results], columns=['Exposure', 'Processed'])
+        processed_nb_df = pd.DataFrame([(exposure, len(filenames)) for exposure, filenames in results], columns=['Exposure', 'Processed'])
         processed_nb_df.sort_values(by='Exposure')
         total_processed = processed_nb_df['Processed'].sum()
         total_processed_df = pd.DataFrame({
@@ -446,10 +478,7 @@ class CosmicRemoval(ParentFunctions):
         })
         processed_nb_df = pd.concat([processed_nb_df, total_processed_df], ignore_index=True)
 
-        filenames_df = pd.DataFrame([filename 
-            for _, _, filename_list in results 
-            for filename in filename_list
-            ], columns=['Filenames'])
+        filenames_df = pd.DataFrame([filename for _, filenames in results for filename in filenames], columns=['Filenames'])
         filenames_df.sort_values(by='Filenames')
         
         # Saving both stats
@@ -863,5 +892,5 @@ if __name__ == '__main__':
 
     import sys
     print(f'Python version is {sys.version}')
-    test = CosmicRemoval(verbose=3)
+    test = CosmicRemoval(verbose=3, statistics=True)
 
