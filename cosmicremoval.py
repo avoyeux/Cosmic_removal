@@ -449,7 +449,7 @@ class CosmicRemoval(ParentFunctions):
                 if os.path.exists(os.path.join(SpiceUtils.ias_fullpath(filename))):
                     image = fits.getdata(SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0].astype('float64')  #TODO: need to check if I need float64 and if np.stack has a dtype argument
                 else:
-                    if self.verbose > 2: print("filename doesn't exist, adding a +1 to the version number", flush=self.flush)
+                    if self.verbose > 1: print("filename doesn't exist, adding a +1 to the version number", flush=self.flush)
                     image = fits.getdata(SpiceUtils.ias_fullpath(new_filename), detector)[0, :, :, 0].astype('float64')
                 mad, mode = self.mad_mode(interval_filenames, detector)
                 mask = image > self.coef * mad + mode     
