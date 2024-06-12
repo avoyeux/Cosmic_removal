@@ -31,6 +31,7 @@ cat = SpiceUtils.read_spice_uio_catalog()
 filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
 init_res = cat[filters]
 
+# TODO: need to check if for the actual processing I am not using the actual acquisition for the mad and mode calculations
 
 class ParentFunctions:
     """Parent class to the Cosmic removal classes as I have created two really similar classes. The first for actually treating the single darks and the
@@ -70,7 +71,7 @@ class ParentFunctions:
         """
 
         paths = {}
-        initial_paths = {'main': os.path.join(os.getcwd(), 'statisticsAndPlots')}
+        initial_paths = {'main': os.path.join(os.getcwd(), 'statisticsAndPlots_processed_fits_no_minfilenb')}
         if self.fits: initial_paths['fits'] = os.path.join(initial_paths['main'], 'fits')
 
         if time_interval != -1:
@@ -104,13 +105,14 @@ class ParentFunctions:
         # Getting the exposure times and nb of occurrences
         exposure_counts = Counter(init_res.XPOSURE)
         exposure_weighted = np.stack(list(exposure_counts.items()), axis=0)
-        occurrences_filter = (exposure_weighted[:, 1] > self.min_filenb)
-        self.exposures = exposure_weighted[occurrences_filter][:, 0]
+        # occurrences_filter = (exposure_weighted[:, 1] > self.min_filenb)
+        # self.exposures = exposure_weighted[occurrences_filter][:, 0]
+        self.exposures = exposure_weighted[:, 0]
 
         # Printing the values
         if self.verbose > 0: 
             for exposure in exposure_weighted: print(f'For exposure time {exposure[0]}s there are {int(exposure[1])} darks.') 
-            print(f'\033[93mExposure times with less than \033[1m{self.min_filenb}\033[0m\033[93m darks are not kept.\033[0m')
+            # print(f'\033[93mExposure times with less than \033[1m{self.min_filenb}\033[0m\033[93m darks are not kept.\033[0m')
             print('\033[33mExposure times kept are:')
             for exposure in self.exposures: print(f'\033[33m{exposure}\033[0m')
 
@@ -153,6 +155,7 @@ class ParentFunctions:
         a = 0
         left_nb = 0
         weird_nb = 0
+        high_voltage = 0
         all_files = []
         for files in filenames:
             # Opening the files
@@ -162,7 +165,10 @@ class ParentFunctions:
             if 'glow' in header['OBS_DESC'].lower(): weird_nb += 1; continue # Weird "glow" darks
             if header['T_SW'] > 0 and header['T_LW'] > 0: a += 1; continue
 
-            if 'PRSTEP6' in header: print(f"\033[31mfile already treated with {header['PRSTEP6']}\033[0m", flush=True); continue
+            # if 'PRSTEP6' in header: print(f"\033[31mfile already treated with {header['PRSTEP6']}\033[0m", flush=True); continue
+            if header['V_GAPSW'] > 2000: high_voltage += 1; continue
+            # if 'Extended' in header['OBS_DESC']: print(f"\033[31mEXTENDED IN HEADER, FILE {files}\033[0m")
+            # if 'background' in header['OBS_DESC']: print(f"\033[31mBACKGROUND IN HEADER, FILE {files}\033[0m")
 
             all_files.append(files)
 
@@ -170,6 +176,7 @@ class ParentFunctions:
             if a != 0: print(f'\033[31mExp{exposure} -- Tot nb files with high temp: {a}\033[0m')
             if left_nb != 0: print(f'\033[31mExp{exposure} -- Tot nb files with bias subtraction: {left_nb}\033[0m')
             if weird_nb != 0: print(f'\033[31mExp{exposure} -- Tot nb of "weird" files: {weird_nb}\033[0m')
+            if high_voltage != 0: print(f'\033[31mExp{exposure} -- Tot nb of "high voltage" files: {high_voltage}\033[0m')
 
         if self.verbose > 0: print(f'Exp{exposure} -- Nb of "usable" files: {len(all_files)}')
 
@@ -227,9 +234,9 @@ class ParentFunctions:
         ], axis=0) 
 
         # Binning the data
-        binned_arr = (images // self.bins) * self.bins
+        binned_arr = (images // self.bins) 
 
-        modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr).astype('float64')  #TODO: a double list comprehension with reshape could be faster
+        modes = np.apply_along_axis(self.mode_along_axis, 0, binned_arr).astype('float64') * self.bins #TODO: a double list comprehension with reshape could be faster
         mads = np.mean(np.abs(images - modes), axis=0)
         return mads, modes
 
@@ -293,6 +300,8 @@ class CosmicRemoval(ParentFunctions):
 
         # Code functions
         self.exposure()
+        # Changing the self.exposures values to only contain the value for which I have error statistics
+        self.exposures = [0.1, 4.6, 9.6, 14.3, 19.6, 29.6, 59.6, 89.6, 119.6]
         self.multiprocess()
 
     @Decorators.running_time
@@ -342,11 +351,11 @@ class CosmicRemoval(ParentFunctions):
         paths = self.paths()
 
         for i, exposure in enumerate(self.exposures[index[0]:index[1] + 1]):
-            filenames = self.Images_all(exposure)
+            filenames = self.images_all(exposure)
             
-            if len(filenames) < self.min_filenb:
-                if self.verbose > 0: print(f'\033[91mInter{self.time_interval}_exp{exposure} -- Less than {self.min_filenb} usable files. Changing exposure times.\033[0m')
-                return None
+            # if len(filenames) < self.min_filenb:
+            #     if self.verbose > 0: print(f'\033[91mInter{self.time_interval}_exp{exposure} -- Less than {self.min_filenb} usable files. Changing exposure times.\033[0m')
+            #     return None
 
             # MULTIPLE DARKS analysis
             same_darks = self.samedarks(filenames)
@@ -476,7 +485,7 @@ class CosmicRemoval(ParentFunctions):
         if queue is None: return processed_filenames
         queue.put((position, processed_filenames if processed_filenames != [] else None))
 
-    def Saving_main_numbers(self, results: list[tuple[float, list[str]]]) -> None:
+    def saving_main_numbers(self, results: list[tuple[float, list[str]]]) -> None:
         """Saving the number of files processed and which SPIOBSID were processed.
 
         Args:
@@ -567,7 +576,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
 
     @typechecked
     def __init__(self, processes: int = 121, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4, time_intervals: list[int] = [6], bins: int = 5, statistics: bool = True, plots: bool = True, 
-                plot_ratio: float = 0.01, verbose: int = 0, flush: bool = False):
+                plot_ratio: float = 0.01, verbose: int = 0, flush: bool = False, circumcision: bool = False):
         """Initialisation of the CosmicRemovalStatsPlots class.
 
         Args:
@@ -593,6 +602,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
         self.bins = bins
         self.plot_ratio = plot_ratio
         self.flush = flush
+        self.circumcision = circumcision
 
         # New class attributes
         self.multiprocessing = True if processes > 1 else False
@@ -603,8 +613,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
 
     @Decorators.running_time
     def main(self) -> None:
-        """
-        Function for multiprocessing if self.processes > 1. No multiprocessing done otherwise.
+        """Function for multiprocessing if self.processes > 1. No multiprocessing done otherwise.
         """
 
         args = list(product(self.time_intervals, self.exposures))
@@ -642,6 +651,17 @@ class CosmicRemovalStatsPlots(ParentFunctions):
 
     @Decorators.running_time
     def each_exposure(self, processes_needed: int, queue_input: QUEUE | None = None, queue_output: QUEUE | None = None, args: tuple[int, float] | None = None) -> pd.DataFrame | None:
+        """_summary_
+
+        Args:
+            processes_needed (int): _description_
+            queue_input (QUEUE | None, optional): _description_. Defaults to None.
+            queue_output (QUEUE | None, optional): _description_. Defaults to None.
+            args (tuple[int, float] | None, optional): _description_. Defaults to None.
+
+        Returns:
+            pd.DataFrame | None: _description_
+        """
 
         while True:
             if self.multiprocessing:
@@ -654,9 +674,9 @@ class CosmicRemovalStatsPlots(ParentFunctions):
 
             filenames = self.images_all(exposure)
 
-            if len(filenames) < self.min_filenb: 
-                if self.verbose > 0: print(f'\033[91mInter{time_interval}_exp{exposure} -- Less than {self.min_filenb} usable files. Changing exposure times.\033[0m', flush=self.flush)
-                return None
+            # if len(filenames) < self.min_filenb: 
+            #     if self.verbose > 0: print(f'\033[91mInter{time_interval}_exp{exposure} -- Less than {self.min_filenb} usable files. Changing exposure times.\033[0m', flush=self.flush)
+            #     return None
 
             # MULTIPLE DARKS analysis
             same_darks = self.samedarks(filenames)
@@ -728,6 +748,12 @@ class CosmicRemovalStatsPlots(ParentFunctions):
 
                 files = same_darks[SPIOBSID]
                 if len(files) < 3: continue
+                first_file = files[0]
+                date_dict = SpiceUtils.parse_filename(first_file)
+                date = parse_date(date_dict['time'])
+                date = f'{date.year:04d}{date.month:02d}{date.day:02d}T{date.hour:02d}{date.minute:02d}{date.second:02d}'
+
+                if self.circumcision and (date > '20240303T000000'): continue
 
                 # Getting the filenames for each time integration
                 kwargs = {
@@ -795,6 +821,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
         last_time = 0
         first_try = 0
         for loop, pandas_dict in enumerate(data_list):
+            if pandas_dict.empty: continue
             time_interval = pandas_dict['Time interval [months]'][0]
             exposure = pandas_dict['Exposure time [s]'][0]
             paths = self.paths(time_interval=time_interval, exposure=exposure)
@@ -874,8 +901,8 @@ class CosmicRemovalStatsPlots(ParentFunctions):
 
         width, rows, cols = np.where(error_masks)
         # Randomly choosing a section of the errors 
-        num_to_keep = int(self.plot_ratio * len(width))
-        indices = np.random.choice(len(width), num_to_keep, replace=False)
+        num_to_keep = int(self.plot_ratio * len(width)) + 1 
+        indices = np.random.choice(len(width), num_to_keep if num_to_keep < len(width) else len(width) , replace=False)
         reduced_w = width[indices]
         reduced_r = rows[indices]
         reduced_c = cols[indices]
@@ -897,11 +924,9 @@ class CosmicRemovalStatsPlots(ParentFunctions):
             mad_pixel = mads[w, r, c]
 
             # ERROR HISTOGRAM
-            hist_name = f'Errors_ID{SPIOBSID}_w{w}_r{r}_c{c}_v2.png'
+            hist_name = f'Errors_ID{SPIOBSID}_w{w}_r{r}_c{c}.png'
             bins = self.binning(images_SPIOBSID[:, r, c])
             plt.hist(images_SPIOBSID[:, r, c], color='green', bins=bins, label="Same ID data", alpha=0.5)
-            bins = self.binning(images_SPIOBSID[w, r, c])
-            plt.hist(pixel_now, bins=bins, label='Studied acquisition', histtype='step', edgecolor='black')
             plt.title(f'Histogram, tot {len(all_filenames) + 1}, same ID {len(files)}, date {date.year:04d}-{date.month:02d}', fontsize=12)
             if pixel_before is not None:
                 bins = self.binning(pixel_before)
@@ -913,6 +938,8 @@ class CosmicRemovalStatsPlots(ParentFunctions):
                 plt.hist(pixel_after, bins=bins, label='Main data after acquisition', color=(0, 0.3, 0.7, 0.2))
             plt.axvline(mode_pixel, color='magenta', linestyle='--', label='Used mode')
             plt.axvline(mode_pixel + self.coef * mad_pixel, color='magenta', linestyle=':', label='Clipping value')
+            bins = self.binning(images_SPIOBSID[:, r, c])
+            plt.hist(pixel_now, bins=bins, label='Studied acquisition', histtype='step', edgecolor='black')
             plt.xlabel('Detector count', fontsize=12)
             plt.ylabel('Frequency', fontsize=12)
             plt.xticks(fontsize=12)
@@ -946,6 +973,10 @@ class CosmicRemovalStatsPlots(ParentFunctions):
         date_min = f'{year_min:04d}{month_min:02d}{date.day:02d}T{date.hour:02d}{date.minute:02d}{date.second:02d}'
         date = f'{date.year:04d}{date.month:02d}{date.day:02d}T{date.hour:02d}{date.minute:02d}{date.second:02d}' # TODO: need to make sure that the date values haven't changed
 
+        if self.circumcision:
+            max_date_because_of_erros = '20240303T000000'
+            date_max = date_max if date_max < max_date_because_of_erros else max_date_because_of_erros
+
         filenames_interval = []
         for filename in filenames:
             name_time = SpiceUtils.parse_filename(filename)['time']
@@ -974,7 +1005,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
         all_filenames = before_filenames + after_filenames
 
         # Checking the data length
-        if len(all_filenames) + 1 < self.set_min:
+        if len(all_filenames) < self.set_min:  
             if self.verbose > 0: print(f'\033[31mInter{time_interval}_exp{exposure}_det{detector}_ID{SPIOBSID} -- Less than {self.set_min} files. Going to next SPIOBSID\033[0m')
             return
 
@@ -1099,7 +1130,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
         tot_detections_weighted = []
         tot_errors_weighted = []
         tot_ratios_weighted = []
-        pandas_intervals = pandas_alldata.groupby('Time interval')
+        pandas_intervals = pandas_alldata.groupby('Time interval [months]')
 
         for key, dataframe_time in pandas_intervals:
             dataframe_time = dataframe_time.reset_index(drop=True)
@@ -1112,7 +1143,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
             exp_detections_weighted = []
             exp_errors_weighted = []
             exp_ratios_weighted = []
-            pandas_exposures = dataframe_time.groupby('Exposure time')
+            pandas_exposures = dataframe_time.groupby('Exposure time [s]')
             for key1, dataframe_exp in pandas_exposures:
                 dataframe_exp = dataframe_exp.reset_index(drop=True)
 
@@ -1139,7 +1170,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
 
             exp_name = f'Alldata_summary_inter{key}.csv'
             exp_path = os.path.join(paths['main'], f'Date_interval{key}')
-            exp_dict = {'Time interval': np.full(len(exps), key), 'Exposure time': exps,
+            exp_dict = {'Time interval [months]': np.full(len(exps), key), 'Exposure time [s]': exps,
                         'Avg nb of used images': exp_avgs_images, 'Nb detections': exp_detections, 'Nb errors': exp_errors,
                         'Ratio': exp_ratios, 'Weighted detections': exp_detections_weighted,
                         'Weighted errors': exp_errors_weighted, 'Weighted ratio': exp_ratios_weighted}
@@ -1168,7 +1199,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
             tot_errors_weighted.append(tot_error_weighted)
             tot_ratios_weighted.append(tot_ratio_weighted)
 
-        inter_dict = {'Time interval': time_intervals, 'Avg used images': avgs_used_images, 'Nb detections': tot_detections,
+        inter_dict = {'Time interval [months]': time_intervals, 'Avg used images': avgs_used_images, 'Nb detections': tot_detections,
                     'Nb errors': tot_errors, 'Ratio': tot_ratios, 'Weighted detections': tot_detections_weighted,
                     'Weighted errors': tot_errors_weighted, 'Weighted ratio': tot_ratios_weighted}
         nw_pandas_inter = pd.DataFrame(inter_dict)
@@ -1180,6 +1211,6 @@ if __name__ == '__main__':
 
     import sys
     print(f'Python version is {sys.version}')
-    # test = CosmicRemoval(verbose=1, statistics=True)
-    test = CosmicRemovalStatsPlots(verbose=1, statistics=True, plots=True)
+    test = CosmicRemoval(verbose=1, statistics=True, processes=64)
+    # test = CosmicRemovalStatsPlots(verbose=2, processes=64, statistics=True, plots=True, circumcision=False, plot_ratio=0.05)
 
