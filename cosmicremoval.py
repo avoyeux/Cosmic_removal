@@ -14,17 +14,11 @@ from collections import Counter
 from typeguard import typechecked
 from dateutil.parser import parse as parse_date
 from multiprocessing.managers import BaseManager as SyncManager
-# from multiprocessing.queues import Queue as QUEUE
+from multiprocessing.queues import Queue as QUEUE
 from multiprocessing import Process, Manager
 
 # Local Python files
 from Common import RE, SpiceUtils, Decorators, MultiProcessing, Pandas
-
-# Determining the type for a multiprocessing.Manager.Queue object
-manager = Manager()
-queue = manager.Queue()
-QUEUE = type(queue)
-manager.shutdown()
 
 # Filtering initialisation
 cat = SpiceUtils.read_spice_uio_catalog()

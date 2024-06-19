@@ -12,26 +12,18 @@ from astropy.io import fits
 from itertools import product
 from collections import Counter
 from typeguard import typechecked
-from dateutil.parser import parse as parse_date
-from multiprocessing.managers import BaseManager as SyncManager
-# from multiprocessing.queues import Queue as QUEUE
 from multiprocessing import Process, Manager
+from dateutil.parser import parse as parse_date
+from multiprocessing.queues import Queue as QUEUE
 
 # Local Python files
-from Common import RE, SpiceUtils, Decorators, MultiProcessing, Pandas
-
-# Determining the type for a multiprocessing.Manager.Queue object
-manager = Manager()
-queue = manager.Queue()
-QUEUE = type(queue)
-manager.shutdown()
+from Common import RE, SpiceUtils, Decorators, Pandas
 
 # Filtering initialisation
 cat = SpiceUtils.read_spice_uio_catalog()
 filters = cat.STUDYDES.str.contains('dark') & (cat['LEVEL'] == 'L1')
 init_res = cat[filters]
 
-# TODO: need to check if for the actual processing I am not using the actual acquisition for the mad and mode calculations
 
 class ParentFunctions:
     """Parent class to the Cosmic removal classes as I have created two really similar classes. The first for actually treating the single darks and the
@@ -70,12 +62,12 @@ class ParentFunctions:
             corresponding directory.
         """
 
-        paths = {}
-        initial_paths = {'main': os.path.join(os.getcwd(), 'statisticsAndPlots_processed_fits_no_minfilenb')}
-        if self.fits: initial_paths['fits'] = os.path.join(initial_paths['main'], 'fits')
+        initial_paths = {'main': os.path.join(os.getcwd(), 'statisticsAndPlots')}
 
         if time_interval != -1:
-            initial_paths['time_interval'] = os.path.join(initial_paths['main'], f'Date_interval{time_interval}')
+            initial_paths['time_interval'] = os.path.join(initial_paths['main'], f'{time_interval}months')
+
+            if self.fits: initial_paths['fits'] = os.path.join(initial_paths['time_interval'], 'fits')
 
             if exposure != -0.1:
                 initial_paths['exposure'] = os.path.join(initial_paths['time_interval'], f'Exposure{exposure}')
@@ -83,17 +75,11 @@ class ParentFunctions:
                 if detector != -1:
                     initial_paths['detector'] = os.path.join(initial_paths['exposure'], f'Detector{detector}')
 
-                    # Secondary paths
-                    directories = []
-                    if self.making_statistics: directories.append('Statistics')
-                    if self.making_plots: directories.append('Histograms')
+                    if self.making_statistics: initial_paths['statistics'] = os.path.join(initial_paths['detector'], 'Statistics')
+                    if self.making_plots: initial_paths['histograms'] = os.path.join(initial_paths['detector'], 'Histograms')
 
-                    paths = {directory: os.path.join(initial_paths['detector'], directory) for directory in directories}
-        all_paths = {}
-        for d in [initial_paths, paths]:
-            for _, path in d.items(): os.makedirs(path, exist_ok=True)
-            all_paths.update(d)
-        return all_paths
+        for path in initial_paths.values(): os.makedirs(path, exist_ok=True)
+        return initial_paths
 
     def exposure(self):
         """Function to find the different exposure times in the SPICE catalogue.
@@ -105,14 +91,11 @@ class ParentFunctions:
         # Getting the exposure times and nb of occurrences
         exposure_counts = Counter(init_res.XPOSURE)
         exposure_weighted = np.stack(list(exposure_counts.items()), axis=0)
-        # occurrences_filter = (exposure_weighted[:, 1] > self.min_filenb)
-        # self.exposures = exposure_weighted[occurrences_filter][:, 0]
         self.exposures = exposure_weighted[:, 0]
 
         # Printing the values
         if self.verbose > 0: 
             for exposure in exposure_weighted: print(f'For exposure time {exposure[0]}s there are {int(exposure[1])} darks.') 
-            # print(f'\033[93mExposure times with less than \033[1m{self.min_filenb}\033[0m\033[93m darks are not kept.\033[0m')
             print('\033[33mExposure times kept are:')
             for exposure in self.exposures: print(f'\033[33m{exposure}\033[0m')
 
@@ -127,7 +110,7 @@ class ParentFunctions:
             pandas_dict = pd.DataFrame(exp_dict)
             sorted_dict = pandas_dict.sort_values(by='Exposure time (s)')
             sorted_dict['Exposure time (s)'] = sorted_dict['Exposure time (s)']
-            total_darks = sorted_dict['Total number of darks'].sum().round()
+            total_darks = sorted_dict['Total number of darks'].sum()
             total_row = pd.DataFrame({
                 'Exposure time (s)': ['Total'], 
                 'Total number of darks': [total_darks],
@@ -136,7 +119,7 @@ class ParentFunctions:
             sorted_dict['Total number of darks'] = sorted_dict['Total number of darks'].astype('int')
             sorted_dict.to_csv(os.path.join(paths['main'], csv_name), index=False)
     
-    def images_all(self, exposure: float) -> list[str] | list[None]:
+    def images_all(self, exposure: float) -> list[str]:
         """Function to get, for a certain exposure time, the corresponding filenames.
 
         Args:
@@ -157,20 +140,18 @@ class ParentFunctions:
         weird_nb = 0
         high_voltage = 0
         all_files = []
-        for files in filenames:
+        for filename in filenames:
             # Opening the files
-            header = fits.getheader(SpiceUtils.ias_fullpath(files), 0)
+            header = fits.getheader(SpiceUtils.ias_fullpath(filename), 0)
 
+            # Filtering the unwanted files
             if header['BLACKLEV'] == 1: left_nb += 1; continue
             if 'glow' in header['OBS_DESC'].lower(): weird_nb += 1; continue # Weird "glow" darks
             if header['T_SW'] > 0 and header['T_LW'] > 0: a += 1; continue
-
-            # if 'PRSTEP6' in header: print(f"\033[31mfile already treated with {header['PRSTEP6']}\033[0m", flush=True); continue
             if header['V_GAPSW'] > 2000: high_voltage += 1; continue
-            # if 'Extended' in header['OBS_DESC']: print(f"\033[31mEXTENDED IN HEADER, FILE {files}\033[0m")
-            # if 'background' in header['OBS_DESC']: print(f"\033[31mBACKGROUND IN HEADER, FILE {files}\033[0m")
 
-            all_files.append(files)
+            # Keeping the 'good' filenames
+            all_files.append(filename)
 
         if self.verbose > 1:
             if a != 0: print(f'\033[31mExp{exposure} -- Tot nb files with high temp: {a}\033[0m')
@@ -179,10 +160,7 @@ class ParentFunctions:
             if high_voltage != 0: print(f'\033[31mExp{exposure} -- Tot nb of "high voltage" files: {high_voltage}\033[0m')
 
         if self.verbose > 0: print(f'Exp{exposure} -- Nb of "usable" files: {len(all_files)}')
-
-        if len(all_files) == 0: 
-            if self.verbose > 0: print(f'\033[91m ERROR: NO "USABLE" ACQUISITIONS FOR EXP{exposure}- CHANGING EXPOSURE\033[0m')
-            return [None]
+        if len(all_files) == 0 and self.verbose > 0: print(f'\033[91m ERROR: NO "USABLE" ACQUISITIONS FOR EXP{exposure}\033[0m')
         return all_files
     
     def mode_along_axis(self, arr: np.ndarray) -> int:
@@ -197,7 +175,7 @@ class ParentFunctions:
 
         return np.bincount(arr.astype('int32')).argmax()
 
-    def samedarks(self, filenames: list[str]) -> dict[str, str]:
+    def samedarks(self, filenames: list[str]) -> dict[str, str | list[str]]:
         """To get a dictionary with the keys representing the possible SPIOBSIDs and the values the corresponding filenames.
         Hence, it can also give you the number of darks per SPIOBSID.
 
@@ -265,15 +243,14 @@ class CosmicRemoval(ParentFunctions):
         re.VERBOSE)
 
     @typechecked
-    def __init__(self, processes: int = 128, max_date: str | None = '20230402T030000', coefficient: int | float = 6, min_filenb: int = 20, 
-                 set_min: int = 4, time_interval: int = 6, statistics: bool = False, bins: int = 5, verbose: int = 1, flush: bool = False):
+    def __init__(self, processes: int = 128, max_date: str | None = '20230402T030000', coefficient: int | float = 6, 
+                 set_min: int = 4, time_intervals: list[int] | int = 6, statistics: bool = False, bins: int = 5, verbose: int = 1, flush: bool = False):
         """To initialise but also run the CosmicRemoval class.
 
         Args:
             processes (int, optional): sets the maximum number of processes for the multi-processing. Defaults to 10.
             max_date (str | None, optional): the maximum date for which the treatment is done on all darks. Defaults to '20230402T030000'.
             coefficient (int | float, optional): the m.a.d. multiplication coefficient that decides what is flagged as a cosmic collision. Defaults to 6.
-            min_filenb (int, optional): the minimum number of files needed in a specific exposure time set to start the treatment. Defaults to 20.
             set_min (int, optional): the minimum number of files need to consider a SPIOBSID set as single darks. Defaults to 6.
             time_interval (int, optional): the time interval considered in months (e.g. 6 is 3 months prior and after each acquisition). Defaults to 6.
             statistics (bool, optional): if True, then statistics are saved in .csv files. Defaults to False.
@@ -287,9 +264,8 @@ class CosmicRemoval(ParentFunctions):
         self.processes = processes
         self.max_date = max_date if max_date is not None else '30000100T000000' 
         self.coef = coefficient
-        self.min_filenb = min_filenb
         self.set_min = set_min
-        self.time_interval = time_interval 
+        self.time_intervals = time_intervals if isinstance(time_intervals, list) else [time_intervals] 
         self.making_statistics = statistics  # resetting the value as it is not exactly the same in the Parent Class.
         self.bins = bins
         self.verbose = verbose
@@ -305,32 +281,48 @@ class CosmicRemoval(ParentFunctions):
         self.multiprocess()
 
     @Decorators.running_time
-    def multiprocess(self) -> None:
+    def main(self) -> None:
         """To run multiple processes if multiprocessing=True.
         """
+
+        # Argument initialisation 
+        exposures_w_filenames = [(exposure, self.images_all(exposure)) for exposure in self.exposures]
+        arg_list = [
+            (time_inter, exposure, SPIOBSID, SPIOBSID_files, filenames)
+            for exposure, filenames in exposures_w_filenames
+            if filenames != []
+            for SPIOBSID, SPIOBSID_files in self.samedarks(filenames).items()
+            for time_inter in self.time_intervals
+        ]
 
         # Choosing to multiprocess or not
         if self.multiprocessing:
             # Setting up the multiprocessing 
             manager = Manager()
-            queue = manager.Queue()
-            indexes = MultiProcessing.Pool_indexes(len(self.exposures), self.processes)
+            input_queue = manager.Queue()
+            output_queue = manager.Queue()
 
-            if self.verbose > 0: print(f'Number of processes used is: {len(indexes) * (self.processes // len(self.exposures))}')
+            for arg in arg_list: input_queue.put(arg)
+            for _ in range(self.processes): input_queue.put(None)
 
-            processes = [Process(target=self.main, args=(index, queue)) for index in indexes]            
+            processes = [Process(target=self.processing, args=(input_queue, output_queue)) for _ in range(self.processes)]
             for p in processes: p.start()
             for p in processes: p.join()
 
             results = []
-            while not queue.empty(): results.append(queue.get())
-        else:
-            results = self.main((0, len(self.exposures) - 1))
+            while not output_queue.empty(): results.append(output_queue.get())
 
-        if self.making_statistics: self.saving_main_numbers(results)
+        else:
+            results = []
+            for arg in arg_list: 
+                result = self.processing(arguments=arg)
+                if result is not None: results.extend(result)
+
+        if self.making_statistics: self.saving_main_numbers(results) # TODO: kept it from the old code but will need to be changed
     
     @Decorators.running_time
-    def main(self, index: tuple[int, int], queue: QUEUE | None = None) -> list[tuple[float, list[str]]] | None:
+    def processing(self, input_queue: QUEUE | None = None, output_queue: QUEUE | None = None, 
+                   arguments: tuple[int, float, str, str | list[str], list[str]] | None = None) -> list[tuple[int, float, str]] | None:
         """Main structure of the code after the multiprocessing. Does the treatment given an exposure time and outputs the results.
 
         Args:
@@ -343,150 +335,95 @@ class CosmicRemoval(ParentFunctions):
         """        
 
         if self.verbose > 2: print(f'The process id is {os.getpid()}')
-        if not self.multiprocessing: results = [None] * len(self.exposures)
 
-        # Deciding to also set multiprocessing if needed
-        processes_needed = self.processes // len(self.exposures)
-        multiprocessing = self.multiprocessing and (processes_needed > 1)
-        paths = self.paths()
+        while True:
+            if self.multiprocessing:
+                arguments = input_queue.get()
+                if arguments is None: return 
 
-        for i, exposure in enumerate(self.exposures[index[0]:index[1] + 1]):
-            filenames = self.images_all(exposure)
-            
-            # if len(filenames) < self.min_filenb:
-            #     if self.verbose > 0: print(f'\033[91mInter{self.time_interval}_exp{exposure} -- Less than {self.min_filenb} usable files. Changing exposure times.\033[0m')
-            #     return None
+            time_inter, exposure, SPIOBSID, SPIOBSID_filenames, filenames = arguments
 
-            # MULTIPLE DARKS analysis
-            same_darks = self.samedarks(filenames)
-            kwargs = {
-                'exposure': exposure,
-                'filenames': filenames,
-                'same_darks': same_darks,
-                'paths': paths,
-            }
-
-            if multiprocessing:
-                # Multiprocessing
-                manager = Manager()
-                sub_queue = manager.Queue()
-                indexes = MultiProcessing.Pool_indexes(len(filenames), processes_needed)
-
-                processes = [
-                    Process(target=self.exposure_loop, kwargs={'index': index, 'queue': sub_queue, 'position': pos, **kwargs}) 
-                    for pos, index in enumerate(indexes)
-                ]
-                for p in processes: p.start()
-                for p in processes: p.join()
-
-                sub_results = [None] * processes_needed
-                while not sub_queue.empty():
-                    identifier, result = sub_queue.get()
-                    sub_results[identifier] = result
-                processed_filenames = [filename for filename_list in sub_results if filename_list is not None for filename in filename_list]
-            else:
-                processed_filenames = self.exposure_loop(index=(0, len(filenames) - 1), **kwargs)    
-            
-            if self.verbose > 0: print(f'\033[1;33mFor exposure {exposure}, {len(processed_filenames)} files processed\033[0m')
-
-            if self.multiprocessing: 
-                queue.put((exposure, processed_filenames))
-            else:
-                results[i] = (exposure, processed_filenames)
-        if not self.multiprocessing: return results
-
-    def exposure_loop(self, exposure: float, filenames: list[str], same_darks: dict[str, str], paths: dict[str, str], index: tuple[int, int], 
-                      queue: QUEUE | None = None, position: int | None = None) -> list[str] | None:
-        """To loop over the filenames for each exposure times. Gives out the corresponding treated filenames with the exposure time used.
-
-        Args:
-            exposure (float): the exposure time used.
-            filenames (list[str]): the list of all the filenames in that exposure time.
-            same_darks (dict[str, str]): dictionary with .items() = (SPIOBSID, corresponding_dark_filenames).
-            paths (dict[str, str]): the path to the needed directories.
-            index (tuple[int, int]): the start and end index for each processes.
-            queue (QUEUE | None, optional): a multiprocessing.Manager.Queue() object. Defaults to None.
-            position (int | None, optional): the index representing the position in the parent loop. Defaults to None.
-
-        Raises:
-            ValueError: if the filenames doesn't match the usual SPICE FITS filenames.
-            ValueError: if there are no NANs in the acquisitions but the header information said there are.
-            ValueError: if there are NANs in the acquisitions but the header information didn't say so.
-
-        Returns:
-            list[str] | None: list of the processed filenames if not multiprocessing this function. Else, just populates the queue object.
-        """
-        
-        processed_filenames = []
-        for loop, filename in enumerate(filenames[index[0]:index[1] + 1]):
-            pattern_match = CosmicRemoval.filename_pattern.match(filename)
-
-            if pattern_match:
-                SPIOBSID = pattern_match.group('SPIOBSID')
+            # INITIAL DATA CHECKS [...]
+            first_filename = SPIOBSID_filenames[0]
+            pattern_match = CosmicRemoval.filename_pattern.match(first_filename)
+            ## [...] pattern
+            if pattern_match: 
                 date = pattern_match.group('time')
                 new_filename = RE.replace_group(pattern_match, 'version', f'{99}')
             else:
-                raise ValueError(f"The filename {filename} doesn't match the expected pattern.")
-            
-            length = len(same_darks[SPIOBSID])
+                raise ValueError(f"The filenames for SPIOBSID {SPIOBSID} doesn't match the expected pattern. The filenames are {SPIOBSID_filenames}")
+            ## [...] multidarks 
+            length = len(SPIOBSID_filenames)
             if length > 3:
                 if date > self.max_date:
-                    if self.verbose > 1: print(f'\033[31mExp{exposure}_imgnb{loop} -- {length} images in SPIOBSID. Going to the next acquisition.\033[0m')
+                    if self.verbose > 1: print(f'\033[31mExp{exposure}_ID{SPIOBSID} -- {len(length)} images in SPIOBSID. Going to the nex ID.\033[0m')
+                    if not self.multiprocessing: return 
                     continue
-                elif self.verbose > 1:
-                    print(f'Image from a SPIOBSID set of {length} darks but before May 2023.')
-            
-            interval_filenames = self.time_integration(filename, filenames)
-            if len(interval_filenames) < self.set_min:
-                if self.verbose > 1: print(f'\033[31mExp{exposure}_imgnb{loop} -- Set is only of {self.set_min} files. Going to the next filename.\033[0m')
+                if self.verbose > 1: print(f'Images from a SPIOBSID set of {length} darks but before May 2023.')
+            ## [...] available nb of images
+            first_interval_filenames = self.time_integration(time_inter, first_filename, filenames)
+            if len(first_interval_filenames) < self.set_min:
+                if self.verbose > 1: print(f'\033[31mExp{exposure}_ID{SPIOBSID} -- Set has only {self.set_min} files. Going to the next SPIOBSID.\033[0m')
+                if not self.multiprocessing: return 
                 continue
 
-            processed_filenames.append(filename)                
+            # Creating the corresponding treated fits file
+            paths = self.paths(time_interval=time_inter)
+            self.fits_creation(paths, first_filename, new_filename, first_interval_filenames)
 
-            check = False
-            new_images = []
-            for detector in range(2):
-                if os.path.exists(os.path.join(SpiceUtils.ias_fullpath(filename))):
-                    image = fits.getdata(SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0].astype('float64')  #TODO: need to check if I need float64 and if np.stack has a dtype argument
-                else:
-                    if self.verbose > 1: print("filename doesn't exist, adding a +1 to the version number", flush=self.flush)
-                    image = fits.getdata(SpiceUtils.ias_fullpath(new_filename), detector)[0, :, :, 0].astype('float64')
-                mad, mode = self.mad_mode(interval_filenames, detector)
-                mask = image > self.coef * mad + mode     
-
-                nw_image = np.copy(image)  # TODO: need to check why np.copy is not the preferred copy method.
-                nw_image[mask] = mode[mask]
-                nw_image = nw_image[np.newaxis, :, :, np.newaxis]
-                if np.isnan(image).any():
-                    if self.verbose > 1: print(f'\033[1;94mImage contains nans: {np.isnan(nw_image).any()}\033[0m')
-                    nw_image[np.isnan(nw_image)] = 65535 
-                    check = True
-                new_images.append(nw_image)
-            new_images = np.stack(new_images, axis=0).astype('uint16')
-
-            # Headers
-            init_header_SW = fits.getheader(SpiceUtils.ias_fullpath(filename), 0)
-            init_header_LW = fits.getheader(SpiceUtils.ias_fullpath(filename), 1)
-
-            if (init_header_LW['NLOSTPIX'] != 0) or (init_header_SW['NLOSTPIX'] != 0):
-                if not check: raise ValueError(f"There should have been a bright blue print before but didn't happen. Filename: {filename}")
+            # Saving the processed filenames
+            result = (time_inter, exposure, SPIOBSID_filename)
+            if self.multiprocessing: 
+                output_queue.put(result)
             else:
-                if check: raise ValueError(f'Nans where found even though there are none in the headers. Filename: {filename}')
+                results = [result]
 
-            # Creating the total hdul
-            hdul_new = []
-            hdul_new.append(fits.PrimaryHDU(data=new_images[0], header=init_header_SW))
-            hdul_new.append(fits.ImageHDU(data=new_images[1], header=init_header_LW))
-            hdul_new = fits.HDUList(hdul_new)
-            hdul_new.writeto(os.path.join(paths['fits'], new_filename), overwrite=True)
+            # Doing the same for the other filenames with the same SPIOBSID
+            if isinstance(SPIOBSID_filenames, list):
+                for SPIOBSID_filename in SPIOBSID_filenames[1:]:
+                    pattern_match = CosmicRemoval.filename_pattern.match(SPIOBSID_filename)
+                    new_filename = RE.replace_group(pattern_match, 'version', f'{99}')
 
-            if self.verbose > 2: print(f'File {filename} processed.', flush=self.flush)
+                    # Fits creation
+                    interval_filenames = self.time_integration(time_inter, SPIOBSID_filename, filenames)
+                    self.fits_creation(paths, SPIOBSID_filename, new_filename, interval_filenames)
 
-        if queue is None: return processed_filenames
-        queue.put((position, processed_filenames if processed_filenames != [] else None))
+                    # Saving results
+                    result = (time_inter, exposure, SPIOBSID_filename)
+                    if self.multiprocessing: 
+                        output_queue.put(result)
+                    else:
+                        results.append(result)
 
-    def saving_main_numbers(self, results: list[tuple[float, list[str]]]) -> None:
-        """Saving the number of files processed and which SPIOBSID were processed.
+            if self.verbose > 0: print(f'\033[1;33mInter{time_inter}_exp{exposure}_ID{SPIOBSID}, files processed\033[0m', flush=self.flush)
+            if not self.multiprocessing: return results       
+            
+    def fits_creation(self, paths: dict[str, str], filename: str, new_filename: str, interval_filenames: list[str]):
+
+        treated_images = []
+        for detector in range(2):
+            image = fits.getdata(SpiceUtils.ias_fullpath(filename), detector)[0, :, :, 0].astype('float64')
+            mad, mode = self.mad_mode(interval_filenames, detector)
+            mask = image > self.coef * mad + mode
+
+            nw_image = np.copy(image)  # TODO: need to check why np.copy is not the preferred copy method.
+            nw_image[mask] = mode[mask]
+            nw_image = nw_image[np.newaxis, :, :, np.newaxis]
+            treated_images.append(nw_image)
+
+        # Headers
+        init_header_SW = fits.getheader(SpiceUtils.ias_fullpath(filename), 0)
+        init_header_LW = fits.getheader(SpiceUtils.ias_fullpath(filename), 1)
+
+        # Creating the new hdul
+        hdul_new = []
+        hdul_new.append(fits.PrimaryHDU(data=treated_images[0], header=init_header_SW))
+        hdul_new.append(fits.ImageHDU(data=treated_images[1], header=init_header_LW))
+        hdul_new = fits.HDUList(hdul_new)
+        hdul_new.writeto(os.path.join(paths['fits'], new_filename), overwrite=True)
+
+    def saving_main_numbers(self, results: list[tuple[int, float, str] | None]) -> None:
+        """Saving the filenames and number of files processed in .csv files.
 
         Args:
             results (list[tuple[float, list[str]]]): the results gotten from running the code as tuples 
@@ -495,35 +432,47 @@ class CosmicRemoval(ParentFunctions):
 
         paths = self.paths()
 
-        # Filenames csv
-        filenames_df = pd.DataFrame([filename for _, filenames in results for filename in filenames], columns=['Filenames'])
-        filenames_df.sort_values(by='Filenames')
-        filenames_name = 'Processed_filenames.csv'
-        filenames_df.to_csv(os.path.join(paths['main'], filenames_name), index=False)
+        # Setting up the data for easier filtering and ordering
+        data_df = pd.DataFrame(results, columns=['Time interval [months]', 'Exposure [s]', 'Filename'])
+        data_df = data_df.sort_values(by=['Time interval [months]', 'Exposure [s]', 'Filename'])
 
-        # Processed nb of files csv
-        processed_nb_df = pd.DataFrame([(exposure, len(filenames)) for exposure, filenames in results], columns=['Exposure time (s)', 'Nb of processed files'])
-        total_processed = processed_nb_df['Nb of processed files'].sum()
-        total_processed_df = pd.DataFrame({
-            'Exposure time (s)': ['Total'],
-            'Nb of processed files': [total_processed],
-        })
-        processed_nb_df = pd.concat([processed_nb_df, total_processed_df], ignore_index=True)
-        df_name = 'Total_darks_info.csv'
-        df = pd.read_csv(os.path.join(paths['main'], df_name))
-        # Making sure the same column values properly match
-        safe_round_kwargs = {
-            'decimals': 1,
-            'try_convert_string': True,
-            'verbose': self.verbose,
-        }
-        df['Exposure time (s)'] = df['Exposure time (s)'].apply(Pandas.safe_round, **safe_round_kwargs)
-        processed_nb_df['Exposure time (s)'] = processed_nb_df['Exposure time (s)'].apply(Pandas.safe_round, **safe_round_kwargs)
-        result_df = df.merge(processed_nb_df, on='Exposure time (s)', how='outer')
-        result_df['Nb of processed files'] = result_df['Nb of processed files'].astype('Int16')
-        result_df.to_csv(os.path.join(paths['main'], df_name), index=False)
+        # Saving all processed filenames
+        data_df_filename = 'Processed_filenames.csv'
+        data_df.to_csv(os.path.join(paths['main'], data_df_filename), index=False)
+
+        # Saving the summary
+        grouped_data_filename = 'Processed_filenb.csv'
+        grouped_data_df = data_df.groupby(['Time interval [months]', 'Exposure [s]']).agg(file_nb=('Filename', 'count')).reset_index()
+        grouped_data_df.to_csv(os.path.join(paths['main'], grouped_data_filename), index=False)
+
+        # Stats for each time interval
+        for time_interval in data_df['Time interval [months]'].unique():
+            paths = self.paths(time_interval=time_interval)
+            time_interval_df = data_df[data_df['Time interval [months]'] == time_interval]
+            
+            # Saving the filenames
+            time_interval_filename = f'Processed_filenames_{time_interval}months.csv'
+            time_interval_df.to_csv(os.path.join(paths['time_interval'], time_interval_filename), index=False)
+
+            # Saving the summary
+            grouped_time_interval_filename = f'Processed_filenb_{time_interval}months.csv'
+            grouped_time_interval_df = time_interval_df.groupby(['Time interval [months]', 'Exposure [s]']).agg(file_nb=('Filename', 'count')).reset_index()
+            grouped_time_interval_df.to_csv(os.path.join(paths['time_interval'], grouped_time_interval_filename), index=False)
+
+            for exposure in time_interval_df['Exposure [s]'].unique():
+                paths = self.paths(time_interval=time_interval, exposure=exposure)
+                exposure_df = time_interval_df[time_interval_df['Exposure [s]'] == exposure]
+
+                # Saving filenames
+                exposure_filename = f'Processed_filenames_{time_interval}months_{exposure}exposure.csv'
+                exposure_df.to_csv(os.path.join(paths['exposure'], exposure_filename), index=False)
+
+                # Saving the summary
+                grouped_exposure_filename = f'Processed_filenb_{time_interval}months_{exposure}exp.csv'
+                grouped_exposure_df = exposure_df.groupby(['Time interval [months]', 'Exposure [s]']).agg(file_nb=('Filename', 'count')).reset_index()
+                grouped_exposure_df.to_csv(os.path.join(paths['exposure'], grouped_exposure_filename), index=False)
         
-    def time_integration(self, filename: str, files: list[str | None]) -> list[str]:
+    def time_integration(self, time_interval: int, filename: str, files: list[str | None]) -> list[str]:
         """Finding the images in the time interval specified for a given filename. Hence, we are getting the sequences of images needed for each individual
         dark treatment.
 
@@ -540,8 +489,8 @@ class CosmicRemoval(ParentFunctions):
 
         year_max = date.year
         year_min = date.year
-        month_max = date.month + int(self.time_interval / 2)
-        month_min = date.month - int(self.time_interval / 2)
+        month_max = date.month + int(time_interval / 2)
+        month_min = date.month - int(time_interval / 2)
 
         if month_max > 12:
             year_max += (month_max - 1) // 12
@@ -575,14 +524,13 @@ class CosmicRemovalStatsPlots(ParentFunctions):
     """
 
     @typechecked
-    def __init__(self, processes: int = 121, coefficient: int | float = 6, min_filenb: int = 20, set_min: int = 4, time_intervals: list[int] = [6], bins: int = 5, statistics: bool = True, plots: bool = True, 
+    def __init__(self, processes: int = 121, coefficient: int | float = 6, set_min: int = 4, time_intervals: list[int] = [6], bins: int = 5, statistics: bool = True, plots: bool = True, 
                 plot_ratio: float = 0.01, verbose: int = 0, flush: bool = False, circumcision: bool = False):
         """Initialisation of the CosmicRemovalStatsPlots class.
 
         Args:
             processes (int, optional): _description_. Defaults to 128.
             coefficient (int | float, optional): _description_. Defaults to 6.
-            min_filenb (int, optional): _description_. Defaults to 20.
             set_min (int, optional): _description_. Defaults to 4.
             time_intervals (list[int], optional): _description_. Defaults to [6].
             bins (int, optional): _description_. Defaults to 5.
@@ -596,7 +544,6 @@ class CosmicRemovalStatsPlots(ParentFunctions):
         # Arguments
         self.processes = processes
         self.coef = coefficient
-        self.min_filenb = min_filenb
         self.set_min = set_min
         self.time_intervals = time_intervals
         self.bins = bins
@@ -674,10 +621,6 @@ class CosmicRemovalStatsPlots(ParentFunctions):
 
             filenames = self.images_all(exposure)
 
-            # if len(filenames) < self.min_filenb: 
-            #     if self.verbose > 0: print(f'\033[91mInter{time_interval}_exp{exposure} -- Less than {self.min_filenb} usable files. Changing exposure times.\033[0m', flush=self.flush)
-            #     return None
-
             # MULTIPLE DARKS analysis
             same_darks = self.samedarks(filenames)
 
@@ -723,10 +666,8 @@ class CosmicRemovalStatsPlots(ParentFunctions):
                 for i, SPIOBSID in enumerate(same_darks): results[i] = self.each_exposure_sub(SPIOBSID=SPIOBSID, **kwargs)
                 data_pandas_exposure = pd.concat(results, ignore_index=True)
             
-            if not self.making_statistics:
-                return
-            elif not self.multiprocessing:
-                return data_pandas_exposure
+            if not self.making_statistics: return
+            if not self.multiprocessing: return data_pandas_exposure
             queue_output.put(data_pandas_exposure)
     
         if self.verbose > 1: print(f'Inter{time_interval}_exp{exposure} -- Chunks finished and histogram plotting done.', flush=self.flush)
