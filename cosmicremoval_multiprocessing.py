@@ -80,6 +80,46 @@ class ParentFunctions:
 
         for path in initial_paths.values(): os.makedirs(path, exist_ok=True)
         return initial_paths
+    
+    @Decorators.running_time
+    def main(self) -> None:
+        """To run multiple processes if multiprocessing=True.
+        """
+
+        # Argument initialisation 
+        exposures_w_filenames = [(exposure, self.images_all(exposure)) for exposure in self.exposures]
+        arg_list = [
+            (time_inter, exposure, SPIOBSID, SPIOBSID_files, filenames)
+            for exposure, filenames in exposures_w_filenames
+            if filenames != []
+            for SPIOBSID, SPIOBSID_files in self.samedarks(filenames).items()
+            for time_inter in self.time_intervals
+        ]
+
+        # Choosing to multiprocess or not
+        if self.multiprocessing:
+            # Setting up the multiprocessing 
+            manager = Manager()
+            input_queue = manager.Queue()
+            output_queue = manager.Queue()
+
+            for arg in arg_list: input_queue.put(arg)
+            for _ in range(self.processes): input_queue.put(None)
+
+            processes = [Process(target=self.processing, args=(input_queue, output_queue)) for _ in range(self.processes)]
+            for p in processes: p.start()
+            for p in processes: p.join()
+
+            results = []
+            while not output_queue.empty(): results.append(output_queue.get())
+
+        else:
+            results = []
+            for arg in arg_list: 
+                result = self.processing(arguments=arg)
+                if result is not None: results.extend(result)
+
+        if self.making_statistics: self.saving_main_numbers(results) 
 
     def exposure(self):
         """Function to find the different exposure times in the SPICE catalogue.
@@ -278,47 +318,7 @@ class CosmicRemoval(ParentFunctions):
         self.exposure()
         # Changing the self.exposures values to only contain the value for which I have error statistics
         self.exposures = [0.1, 4.6, 9.6, 14.3, 19.6, 29.6, 59.6, 89.6, 119.6]
-        self.multiprocess()
-
-    @Decorators.running_time
-    def main(self) -> None:
-        """To run multiple processes if multiprocessing=True.
-        """
-
-        # Argument initialisation 
-        exposures_w_filenames = [(exposure, self.images_all(exposure)) for exposure in self.exposures]
-        arg_list = [
-            (time_inter, exposure, SPIOBSID, SPIOBSID_files, filenames)
-            for exposure, filenames in exposures_w_filenames
-            if filenames != []
-            for SPIOBSID, SPIOBSID_files in self.samedarks(filenames).items()
-            for time_inter in self.time_intervals
-        ]
-
-        # Choosing to multiprocess or not
-        if self.multiprocessing:
-            # Setting up the multiprocessing 
-            manager = Manager()
-            input_queue = manager.Queue()
-            output_queue = manager.Queue()
-
-            for arg in arg_list: input_queue.put(arg)
-            for _ in range(self.processes): input_queue.put(None)
-
-            processes = [Process(target=self.processing, args=(input_queue, output_queue)) for _ in range(self.processes)]
-            for p in processes: p.start()
-            for p in processes: p.join()
-
-            results = []
-            while not output_queue.empty(): results.append(output_queue.get())
-
-        else:
-            results = []
-            for arg in arg_list: 
-                result = self.processing(arguments=arg)
-                if result is not None: results.extend(result)
-
-        if self.making_statistics: self.saving_main_numbers(results) # TODO: kept it from the old code but will need to be changed
+        self.main()
     
     @Decorators.running_time
     def processing(self, input_queue: QUEUE | None = None, output_queue: QUEUE | None = None, 
@@ -372,7 +372,7 @@ class CosmicRemoval(ParentFunctions):
             self.fits_creation(paths, first_filename, new_filename, first_interval_filenames)
 
             # Saving the processed filenames
-            result = (time_inter, exposure, SPIOBSID_filename)
+            result = (time_inter, exposure, first_filename)
             if self.multiprocessing: 
                 output_queue.put(result)
             else:
@@ -417,8 +417,8 @@ class CosmicRemoval(ParentFunctions):
 
         # Creating the new hdul
         hdul_new = []
-        hdul_new.append(fits.PrimaryHDU(data=treated_images[0], header=init_header_SW))
-        hdul_new.append(fits.ImageHDU(data=treated_images[1], header=init_header_LW))
+        hdul_new.append(fits.PrimaryHDU(data=treated_images[0].astype('uint16'), header=init_header_SW))
+        hdul_new.append(fits.ImageHDU(data=treated_images[1].astype('uint16'), header=init_header_LW))
         hdul_new = fits.HDUList(hdul_new)
         hdul_new.writeto(os.path.join(paths['fits'], new_filename), overwrite=True)
 
@@ -1152,6 +1152,6 @@ if __name__ == '__main__':
 
     import sys
     print(f'Python version is {sys.version}')
-    test = CosmicRemoval(verbose=1, statistics=True, processes=64)
+    test = CosmicRemoval(verbose=1, time_intervals=[6], statistics=True, processes=64, flush=True)
     # test = CosmicRemovalStatsPlots(verbose=2, processes=64, statistics=True, plots=True, circumcision=False, plot_ratio=0.05)
 
