@@ -31,7 +31,7 @@ class ParentFunctions:
     Therefore, this class is only here to store the common functions to both the aforementioned classes.
     """
 
-    def __init__(self, fits: bool, statistics: bool, plots: bool, verbose: int):
+    def __init__(self):
         """The initialisation of the class.
 
         Args:
@@ -43,10 +43,10 @@ class ParentFunctions:
         """
         
         # Shared attributes
-        self.fits = fits
-        self.making_statistics = statistics
-        self.making_plots = plots
-        self.verbose = verbose
+        self.fits: bool
+        self.making_statistics: bool
+        self.making_plots: bool
+        self.verbose: int
 
     def paths(self, time_interval: int = -1, exposure: float = -0.1, detector: int = -1) -> dict[str, str]:
         """Function to create all the different paths. Lots of if statements to be able to create the needed directories 
@@ -93,11 +93,15 @@ class ParentFunctions:
             input_queue = manager.Queue()
             output_queue = manager.Queue()
 
-            for arg in arg_list: input_queue.put(arg)
-            for _ in range(self.processes): input_queue.put(None)
+            # Choosing the number of processes
+            processes_nb = min(self.processes, len(arg_list))
+            if self.verbose > 0: print(f'number of processed used are {processes_nb}')
 
-            processes = [] * self.processes
-            for i in range(self.processes):
+            for arg in arg_list: input_queue.put(arg)
+            for _ in range(processes_nb): input_queue.put(None)
+
+            processes = [None] * processes_nb
+            for i in range(processes_nb):
                 p = Process(target=self.processing, args=(input_queue, output_queue))
                 p.start()
                 processes[i] = p
@@ -110,8 +114,11 @@ class ParentFunctions:
             results = []
             for arg in arg_list: 
                 result = self.processing(arguments=arg)
-                if result is not None: results.extend(result)
-
+                if result is not None:
+                    if isinstance(result, list):
+                        results.extend(result)
+                    else:
+                        results.append(result)
         if self.making_statistics: self.saving_main_numbers(results) 
 
     def exposure(self):
@@ -277,7 +284,7 @@ class CosmicRemoval(ParentFunctions):
 
     @typechecked
     def __init__(self, processes: int = 128, max_date: str | None = '20230402T030000', coefficient: int | float = 6, 
-                 set_min: int = 4, time_intervals: list[int] | int = 6, statistics: bool = False, bins: int = 5, verbose: int = 1, flush: bool = False):
+                 set_min: int = 4, time_intervals: int | list[int] = 6, statistics: bool = False, bins: int = 5, verbose: int = 1, flush: bool = False):
         """To initialise but also run the CosmicRemoval class.
 
         Args:
@@ -292,8 +299,12 @@ class CosmicRemoval(ParentFunctions):
             flush (bool, optional): sets the flush argument of some of the main print statements. Defaults to False.
         """
     
-        super().__init__(True, False, False, verbose)
+        super().__init__()
         # Arguments
+        self.fits = False
+        self.making_statistics = False
+        self.making_plots = False
+        
         self.processes = processes
         self.max_date = max_date if max_date is not None else '30000100T000000' 
         self.coef = coefficient
@@ -543,8 +554,12 @@ class CosmicRemovalStatsPlots(ParentFunctions):
             flush (bool, optional): _description_. Defaults to False.
         """
         
-        super().__init__(False, statistics, plots, verbose)
+        super().__init__()
         # Arguments
+        self.fits = False
+        self.making_statistics = statistics
+        self.making_plots = plots
+        self.verbose = verbose
         self.processes = processes
         self.coef = coefficient
         self.set_min = set_min
@@ -582,31 +597,27 @@ class CosmicRemovalStatsPlots(ParentFunctions):
                 time_interval, exposure, SPIOBSID, SPIOBSID_files, filenames = item
             else:
                 time_interval, exposure, SPIOBSID, SPIOBSID_files, filenames = arguments
-            
+
+            # Getting the filenames for each time integration
+            kwargs = {
+                'time_interval': time_interval,
+                'filenames': filenames,
+                'SPIOBSID_files': SPIOBSID_files,
+            }
+            used_filenames = self.time_integration(**kwargs)
+
+            # Checking the data length
+            total_length = sum(map(len, used_filenames))
+            if total_length < self.set_min:  
+                if self.verbose > 0: print(f'\033[31mInter{time_interval}_exp{exposure}_ID{SPIOBSID} -- Less than {self.set_min} files. Going to next SPIOBSID\033[0m')
+                if self.multiprocessing: continue
+                return
+        
             for detector in range(2):
                 if self.making_statistics: data_pandas_detector = pd.DataFrame()
 
                 # Path initialisation
                 paths = self.paths(time_interval=time_interval, exposure=exposure, detector=detector)
-
-
-
-                # Getting the filenames for each time integration
-                kwargs = {
-                    'time_interval': time_interval,
-                    'exposure': exposure,
-                    'detector': detector,
-                    'filenames': filenames,
-                    'SPIOBSID': SPIOBSID,
-                    'SPIOBSID_files': SPIOBSID_files,
-                }
-                used_filenames = self.time_integration(**kwargs)
-                total_length = sum(map(len, used_filenames))
-                # Checking the data length
-                if total_length < self.set_min:  
-                    if self.verbose > 0: print(f'\033[31mInter{time_interval}_exp{exposure}_det{detector}_ID{SPIOBSID} -- Less than {self.set_min} files. Going to next SPIOBSID\033[0m')
-                    if self.multiprocessing: continue
-                    return
 
                 # Getting the treatment data for each same SPIOBSID file
                 kwargs = {
@@ -649,7 +660,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
                 }
                 data_pandas = self.unique_datadict(**kwargs)
                 csv_name = f'Info_for_ID{SPIOBSID}.csv'
-                data_pandas.to_csv(os.path.join(paths['Statistics'], csv_name), index=False)
+                data_pandas.to_csv(os.path.join(paths['statistics'], csv_name), index=False)
                 data_pandas_detector = pd.concat([data_pandas_detector, data_pandas], ignore_index=True)
 
             if self.verbose > 1: print(f'Inter{time_interval}_exp{exposure}_ID{SPIOBSID} -- Chunks finished and histogram plotting done.', flush=self.flush)
@@ -783,7 +794,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
             plt.xticks(fontsize=12)
             plt.yticks(fontsize=12)
             plt.legend()
-            plt.savefig(os.path.join(paths['Histograms'], hist_name), bbox_inches='tight', dpi=300)
+            plt.savefig(os.path.join(paths['histograms'], hist_name), bbox_inches='tight', dpi=300)
             plt.close()
 
     def time_integration(self, time_interval: int, filenames: list[str], SPIOBSID_files: list[str]) -> tuple[list[str], list[str]] | None:
@@ -941,7 +952,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
     def average_statistics(self):
         paths = self.paths()
 
-        mainfile_path = os.path.join(paths['main'], 'Alldata.csv')
+        mainfile_path = os.path.join(paths['main'], 'All_errors.csv')
         pandas_alldata = pd.read_csv(mainfile_path)
 
         avgs_used_images = []
@@ -990,8 +1001,8 @@ class CosmicRemovalStatsPlots(ParentFunctions):
                 exp_errors_weighted.append(exp_error_weighted)
                 exp_ratios_weighted.append(exp_ratio_weighted)
 
-            exp_name = f'Alldata_summary_inter{key}.csv'
-            exp_path = os.path.join(paths['main'], f'Date_interval{key}')
+            exp_name = f'Errors_summary_inter{key}.csv'
+            exp_path = os.path.join(paths['main'], f'{key}months')
             exp_dict = {'Time interval [months]': np.full(len(exps), key), 'Exposure time [s]': exps,
                         'Avg nb of used images': exp_avgs_images, 'Nb detections': exp_detections, 'Nb errors': exp_errors,
                         'Ratio': exp_ratios, 'Weighted detections': exp_detections_weighted,
@@ -1025,7 +1036,7 @@ class CosmicRemovalStatsPlots(ParentFunctions):
                     'Nb errors': tot_errors, 'Ratio': tot_ratios, 'Weighted detections': tot_detections_weighted,
                     'Weighted errors': tot_errors_weighted, 'Weighted ratio': tot_ratios_weighted}
         nw_pandas_inter = pd.DataFrame(inter_dict)
-        inter_name = f'Alldata_main_summary.csv'
+        inter_name = f'All_errors_main_summary.csv'
         nw_pandas_inter.to_csv(os.path.join(paths['main'], inter_name), index=False)
 
 
@@ -1033,6 +1044,6 @@ if __name__ == '__main__':
 
     import sys
     print(f'Python version is {sys.version}')
-    test = CosmicRemoval(verbose=1, time_intervals=[6], statistics=True, processes=64, flush=True)
-    # test = CosmicRemovalStatsPlots(verbose=2, processes=64, statistics=True, plots=True, circumcision=False, plot_ratio=0.05)
+    # test = CosmicRemoval(verbose=1, time_intervals=[6], statistics=True, processes=64, flush=True)
+    test = CosmicRemovalStatsPlots(verbose=1, processes=64, time_intervals=[6], statistics=True, plots=True, plot_ratio=0.01, flush=True)
 
